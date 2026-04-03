@@ -129,7 +129,8 @@ def store_completeness(
 
         X          = adata[idx, :].layers[layer] if layer else adata[idx, :].X
         n_samples  = X.shape[0]
-        n_features = X.shape[1]
+        detected_in_lab = np.sum(~np.isnan(X), axis=0) > 0
+        n_features_lab  = detected_in_lab.sum()
 
-        adata.obs.loc[idx, obs_col]                      = np.sum(~np.isnan(X), axis=1) / n_features
+        adata.obs.loc[idx, obs_col]                      = np.sum(~np.isnan(X), axis=1) / n_features_lab
         adata.var[f'completeness_feature_{lab}{suffix}'] = np.sum(~np.isnan(X), axis=0) / n_samples
