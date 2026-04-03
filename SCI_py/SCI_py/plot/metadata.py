@@ -164,7 +164,6 @@ def plot_diameter_per_plate_and_condition(ax, metadata, plate_order):
         valid_plates = [(i, p) for i, p in enumerate(plate_order)
                         if len(sub[sub['plate_idx'] == p]['Diameter'].dropna()) > 1]
 
-        print(f"{cond}: {len(valid_plates)} valid plates")
         if not valid_plates:
             continue
 
@@ -172,9 +171,6 @@ def plot_diameter_per_plate_and_condition(ax, metadata, plate_order):
         groups  = [sub[sub['plate_idx'] == p]['Diameter'].dropna().values
                    for p in plates]
         x_pos   = np.array(indices, dtype=float) + offsets[j]
-
-        print(f"  x_pos: {x_pos}")
-        print(f"  group sizes: {[len(g) for g in groups]}")
 
         parts = ax.violinplot(
             groups,
