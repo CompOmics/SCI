@@ -4,7 +4,7 @@ import matplotlib.gridspec as gridspec
 import numpy as np
 import pandas as pd
 import os
-from .constants import CONDITION_COLORS, LAB_COLORS
+from ..constants.plotting import CONDITION_COLORS, LAB_COLORS
 
 
 def plot_cell_types_per_plate(ax, metadata, plate_order):

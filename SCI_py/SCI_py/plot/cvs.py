@@ -4,7 +4,7 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from .constants import CONDITION_ORDER, LAB_ORDER, LAB_COLORS, CONDITION_COLORS
+from ..constants.plotting import CONDITION_ORDER, LAB_ORDER, LAB_COLORS, CONDITION_COLORS
 from .utilities import _save, _save_legend
 
 def plot_cvs_overview(

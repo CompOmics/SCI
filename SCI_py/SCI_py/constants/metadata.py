@@ -1,27 +1,3 @@
-LABS = [
-    'BYU_timsTOF_1',
-    'Broad_timsTOF_1',
-    'KI_Astral_1',
-    'LSMBO_Astral_1',
-    'KI_Astral_2',
-    'DTU_Astral_1',
-    'IMP_Astral_1',
-    'Wyss_Astral_1',
-    'IMP_timsTOF_1'
-]
-
-LAB_NAME_MAPPING = {
-    'DTU_Astral_1'   : 'Astral_1',
-    'LSMBO_Astral_1' : 'Astral_2',
-    'KI_Astral_1'    : 'Astral_3',
-    'Wyss_Astral_1'  : 'Astral_4',
-    'IMP_Astral_1'   : 'Astral_5',
-    'KI_Astral_2'    : 'Astral_6',
-    'IMP_timsTOF_1'  : 'timsTOF_1',
-    'Broad_timsTOF_1': 'timsTOF_2',
-    'BYU_timsTOF_1'  : 'timsTOF_3',
-}
-
 LAB_TO_PLATENR = {
     'BYU_timsTOF_1'  : -1,  # Unsure
     'Broad_timsTOF_1': 8,

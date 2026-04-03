@@ -19,14 +19,14 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .constants import (
+from ..constants.metadata import (
     _X_TO_COL,
     INSTITUTE_PATTERNS,
-    LAB_NAME_MAPPING,
     N_ROWS,
     SCALAR_IMPUTATIONS,
     SOURCE_NAME_MAPS,
 )
+from ..constants.maps import LAB_NAME_MAPPING
 
 __all__ = [
     "parse_metadata_columns",

@@ -31,7 +31,7 @@ from glob import glob
 
 import pandas as pd
 
-from .constants import LAB_TO_PLATENR, PLATE_ANNOTATIONS
+from ..constants.metadata import LAB_TO_PLATENR, PLATE_ANNOTATIONS
 from .parse import FILENAME_CONVERTERS, xy_to_rc
 
 __all__ = [
