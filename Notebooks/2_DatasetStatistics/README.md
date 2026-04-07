@@ -10,11 +10,11 @@ This directory contains notebooks that characterise the quantitative quality and
 
 ```
 Data/AnnData/
-  adata_precursor.h5ad  ──┬──► 01_Counts_CVs.ipynb ──► Figures/Figure_2/ (panels A, B, C)
+  adata_precursor.h5ad  ──┬──► 01_Counts_CVs.ipynb ──► Figures/Figure_3/ (panels A, B, C)
   adata_protein.h5ad    ──┘
   adata_precursor_qc.h5ad  ──┐
   adata_protein_qc.h5ad    ──┤
-                              └──► 02_QC_Metrics.ipynb ──► Figures/Figure_3/ (panels A–F + Supp.)
+                              └──► 02_QC_Metrics.ipynb ──► Figures/Figure_4/ (panels A–F + Supp.)
 Data/Parquet/                                          ──► Data/AnnData/ (updated with QC columns)
   search_results.parquet  ──┘
 ```
@@ -51,17 +51,17 @@ Per-lab binary identification heatmaps (detected / not detected) across all prec
 
 | Panel | File | Description |
 |---|---|---|
-| A | `A/counts_overview_precursors.png` | Precursor ID counts, all labs combined |
-| A | `A/counts_overview_precursors_SPLIT.png` | Precursor ID counts, one panel per lab |
-| A | `A/counts_overview_proteins.png` | Protein ID counts, all labs combined |
-| A | `A/counts_overview_proteins_SPLIT.png` | Protein ID counts, one panel per lab |
-| B | `B/CV_overview_proteins_common_box.png` | Protein CVs, common proteome |
-| B | `B/CV_overview_proteins_all_box.png` | Protein CVs, per-condition proteome |
-| B | `B/CV_overview_precursors_common_box.png` | Precursor CVs, common proteome |
-| B | `B/CV_overview_precursors_all_box.png` | Precursor CVs, per-condition proteome |
-| C | `C/{lab}_identification_heatmap.png` | Per-lab binary missingness heatmap (precursor & protein) |
-| C | `C/legend_heatmap_conditions.png` | Condition colour legend |
-| C | `C/legend_heatmap_identification.png` | Identification/missing colour legend |
+| A | `Completeness/counts_overview_precursors.png` | Precursor ID counts, all labs combined |
+| A | `Completeness/counts_overview_precursors_SPLIT.png` | Precursor ID counts, one panel per lab |
+| A | `Completeness/counts_overview_proteins.png` | Protein ID counts, all labs combined |
+| A | `Completeness/counts_overview_proteins_SPLIT.png` | Protein ID counts, one panel per lab |
+| B | `CV/CV_overview_proteins_common_box.png` | Protein CVs, common proteome |
+| B | `CV/CV_overview_proteins_all_box.png` | Protein CVs, per-condition proteome |
+| B | `CV/CV_overview_precursors_common_box.png` | Precursor CVs, common proteome |
+| B | `CV/CV_overview_precursors_all_box.png` | Precursor CVs, per-condition proteome |
+| C | `ID_Heatmap/{lab}_identification_heatmap.png` | Per-lab binary missingness heatmap (precursor & protein) |
+| C | `ID_Heatmap/legend_heatmap_conditions.png` | Condition colour legend |
+| C | `ID_Heatmap/legend_heatmap_identification.png` | Identification/missing colour legend |
 
 ---
 
@@ -97,19 +97,19 @@ The elution profile of each sample is represented as the proportion of identifie
 - *Per-lab supplementary figures* — individual sample curves (transparent) overlaid with per-condition group means. Reveal whether instability is condition-specific or lab-wide.
 - *Overview figures* — group mean curves only, coloured by lab, generated separately for single-cell (K562, HEK293T) and QC conditions.
 
-#### Outputs (`Figures/Figure_3/`)
+#### Outputs (`Figures/Figure_4/`)
 
 | Panel | File | Description |
 |---|---|---|
-| A | `A/RT_stability_overview_SC.png` | RT stability overview, single-cell conditions, coloured by lab |
-| B | `B/RT_stability_overview_QC.png` | RT stability overview, QC conditions, coloured by lab |
-| C | `C/plate_heatmap_protein_{lab}.png` | Per-lab protein ID plate heatmap |
-| D | `D/plate_heatmap_precursor_{lab}.png` | Per-lab precursor ID plate heatmap |
-| E | `E/completeness_precursors_SC.png` | Precursor completeness curves, single cells |
-| E | `E/completeness_precursors_QC.png` | Precursor completeness curves, QC injections |
-| F | `F/completeness_proteins_SC.png` | Protein completeness curves, single cells |
-| F | `F/completeness_proteins_QC.png` | Protein completeness curves, QC injections |
-| Supp. | `Supplementary/RT_stability_{lab}.png` | Per-lab RT stability coloured by condition |
+| A | `RT_Stability/RT_stability_overview_SC.png` | RT stability overview, single-cell conditions, coloured by lab |
+| B | `RT_Stability/RT_stability_overview_QC.png` | RT stability overview, QC conditions, coloured by lab |
+| C | `Plate_Heatmap/plate_heatmap_protein_{lab}.png` | Per-lab protein ID plate heatmap |
+| D | `Plate_Heatmap/plate_heatmap_precursor_{lab}.png` | Per-lab precursor ID plate heatmap |
+| E | `Completeness/completeness_precursors_SC.png` | Precursor completeness curves, single cells |
+| E | `Completeness/completeness_precursors_QC.png` | Precursor completeness curves, QC injections |
+| F | `Completeness/completeness_proteins_SC.png` | Protein completeness curves, single cells |
+| F | `Completeness/completeness_proteins_QC.png` | Protein completeness curves, QC injections |
+| Supp. | `RT_Stability/RT_stability_{lab}.png` | Per-lab RT stability coloured by condition |
 
 #### AnnData updates
 
