@@ -1,0 +1,12 @@
+# Python cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Package build artefacts
+**/*.egg-info/
+dist/
+build/
+
+# Data
+Data/**

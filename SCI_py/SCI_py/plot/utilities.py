@@ -2,8 +2,13 @@ import os
 from matplotlib import pyplot as plt
 
 def _save(fig, path: str) -> None:
-    os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
-    fig.savefig(path, bbox_inches='tight', transparent=True)
+    base, _ = os.path.splitext(os.path.basename(path))
+    root    = os.path.dirname(path)
+
+    for fmt in ('png', 'svg', 'pdf'):
+        out = os.path.join(root, fmt, f'{base}.{fmt}')
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        fig.savefig(out, bbox_inches='tight', transparent=True, format=fmt)
 
 
 def _save_legend(ax, save_dir: str, filename: str = 'legend.png') -> None:

@@ -16,6 +16,9 @@ def _metric_label(count_col: str) -> str:
     _METRIC_LABELS = {
         'n_proteins'  : 'Number of proteins',
         'n_precursors': 'Number of precursors',
+        'n_proteins_withCont'  : 'Number of proteins',
+        'n_precursors_withCont': 'Number of precursors',
+        'pct_contaminant' : '% contaminant identifications',
     }
     return _METRIC_LABELS.get(count_col, count_col.replace('_', ' ').title())
 
