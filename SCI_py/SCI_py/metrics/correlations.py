@@ -1,0 +1,370 @@
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+from scipy.stats import rankdata, spearmanr
+from scipy.stats import mannwhitneyu
+from tqdm import tqdm
+
+from ..constants.maps import LABS
+
+# ---------------------------------------------------------------------------
+# Reference set construction
+# ---------------------------------------------------------------------------
+
+def create_reference_set(
+    adata,
+    conditions:              list[str],
+    layer:                   str = '',
+    min_sample_completeness: float = 0.30,
+    min_protein_completeness: float = 0.50,
+    random_seed:             int   = 42,
+) -> tuple[dict, pd.DataFrame]:
+    """
+    Build a reference protein set with equalised missingness across labs.
+
+    Three steps are applied per condition:
+
+    1. **Sample filtering** — remove samples whose protein count falls
+       below ``min_sample_completeness × median`` for their lab.
+    2. **Reference protein selection** — keep proteins detected in at least
+       ``min_protein_completeness`` of samples in *every* lab.
+    3. **Missingness equalisation** — randomly mask observed values so that
+       each lab's per-protein missingness matches the worst-case lab,
+       ensuring fair cross-lab comparisons.
+
+    Parameters
+    ----------
+    adata:
+        AnnData with ``plate_idx`` and ``source name`` in ``obs``.
+    conditions:
+        Source names to process.
+    layer:
+        Expression matrix to use in ``.layers``. Defaults to ``X`` matrix.
+    min_sample_completeness:
+        Fraction of median protein count below which a sample is excluded.
+    min_protein_completeness:
+        Minimum per-lab detection fraction for a protein to be retained.
+    random_seed:
+        Seed for reproducible random masking.
+
+    Returns
+    -------
+    masked_data:
+        ``{condition: {lab: X_masked}}`` — reference matrices per
+        condition and lab with equalised missingness.
+    stats:
+        DataFrame with masking statistics per condition and lab.
+    """
+    rng         = np.random.default_rng(random_seed)
+    masked_data = {}
+    stats       = []
+
+    for cond in conditions:
+        obs_cond = adata.obs[adata.obs['source name'] == cond].copy()
+
+        # Step 1 — sample filter
+        kept_samples = _filter_samples(adata, obs_cond, min_sample_completeness)
+        obs_filtered = obs_cond.loc[kept_samples]
+
+        # Step 2 — reference proteins
+        lab_completeness = _compute_lab_completeness(adata, obs_filtered)
+        if not lab_completeness:
+            continue
+
+        completeness_matrix = np.vstack(list(lab_completeness.values()))
+        reference_idx       = np.where(
+            np.all(completeness_matrix >= min_protein_completeness, axis=0)
+        )[0]
+        print(f'{cond}: {len(reference_idx)} reference proteins')
+
+        # Step 3 — equalise missingness
+        valid_labs          = [l for l in LABS if l in lab_completeness]
+        missingness_matrix  = 1 - completeness_matrix[:, reference_idx]
+        target_missingness  = np.max(missingness_matrix, axis=0)
+
+        masked_data[cond] = {}
+        for lab_i, lab in enumerate(valid_labs):
+            lab_obs   = obs_filtered[obs_filtered['plate_idx'] == lab]
+            idx       = [adata.obs.index.get_loc(s) for s in lab_obs.index]
+            
+            if layer == '':
+                X_lab     = adata.X[np.ix_(idx, reference_idx)].copy()
+            elif layer in adata.layers.keys():
+                X_lab = adata.layers[layer][np.ix_(idx, reference_idx)].copy()
+            else:
+                raise Exception(f'{layer} does not exist in {adata.X.layers}. Leave empty to select X.')
+                
+            X_lab, n_masked = _equalise_missingness(
+                X_lab, missingness_matrix[lab_i], target_missingness, rng
+            )
+            masked_data[cond][lab] = X_lab
+
+            total_observed = np.sum(~np.isnan(X_lab))
+            stats.append({
+                'condition'              : cond,
+                'lab'                    : lab,
+                'n_reference_proteins'   : len(reference_idx),
+                'n_samples'              : len(idx),
+                'total_masked'           : sum(n_masked),
+                'pct_masked'             : sum(n_masked) / (total_observed + sum(n_masked)) * 100,
+                'mean_masked_per_protein': np.mean(n_masked),
+            })
+
+    return masked_data, pd.DataFrame(stats)
+
+def compute_pairwise_correlations(
+    masked_data:    dict,
+    conditions:     list[str],
+    adata,
+    min_coobserved: int       = 50,
+    methods:        list[str] = ('spearman', 'pearson'),
+) -> dict[str, pd.DataFrame]:
+    """
+    Compute all pairwise sample correlations within each condition.
+
+    For each condition, all lab matrices from ``masked_data`` are
+    concatenated and every sample pair ``(i, j)`` is correlated over
+    their co-observed proteins.  Pairs with fewer than ``min_coobserved``
+    co-observed proteins are set to ``NaN``.
+
+    Each pair is classified as:
+
+    * ``intra_lab``                  — both samples from the same lab.
+    * ``inter_lab_same_instrument``  — different labs, same instrument type.
+    * ``inter_lab_diff_instrument``  — different labs, different instruments.
+
+    Parameters
+    ----------
+    masked_data:
+        Output of ``create_reference_set`` —
+        ``{condition: {lab: X_masked}}``.
+    conditions:
+        Conditions to process.
+    adata:
+        AnnData with ``plate_idx`` and ``instrument_type`` in ``obs``.
+    min_coobserved:
+        Minimum number of co-observed proteins required to compute a
+        correlation.  Pairs below this threshold are excluded.
+    methods:
+        Correlation methods to compute.  Any subset of
+        ``['spearman', 'pearson']``.
+
+    Returns
+    -------
+    dict mapping condition → DataFrame of pairwise correlation records.
+    """
+    results = {}
+
+    for cond in conditions:
+        cond_data = masked_data.get(cond, {})
+        if not cond_data:
+            continue
+
+        X_all, meta_df = _build_condition_matrix(cond_data, adata)
+        n_total        = X_all.shape[0]
+        print(f'{cond}: {n_total} samples × {X_all.shape[1]} proteins '
+              f'→ {n_total * (n_total - 1) // 2:,} pairs')
+
+        X_ranked = _precompute_transforms(X_all, methods)
+        records = _compute_pairs(
+            X_all,
+            X_ranked,
+            meta_df,
+            cond,
+            methods,
+            min_coobserved
+        )
+
+        results[cond] = pd.DataFrame(records)
+        print(f'  Done: {len(records):,} valid pairs')
+
+    return results
+
+
+def compute_pairwise_stats(
+    group_a: pd.Series,
+    group_b: pd.Series,
+    label_a: str,
+    label_b: str,
+    meaningful_delta: float = 0.02,  # minimum correlation difference worth reporting
+) -> dict:
+    """
+    Compare two correlation distributions.
+    Uses median difference as the primary effect size.
+    Mann-Whitney p-value is reported but should not be used alone
+    given large sample sizes — focus on delta and practical_sig instead.
+    """
+    a, b   = group_a.dropna(), group_b.dropna()
+    _, p   = mannwhitneyu(a, b, alternative='two-sided')
+    delta  = group_a.median() - group_b.median()
+
+    # Common language effect size (probability that a random value from A > B)
+    # Equivalent to the rank-biserial correlation
+    n_a, n_b = len(a), len(b)
+    u_stat, _ = mannwhitneyu(a, b, alternative='greater')
+    cles = u_stat / (n_a * n_b)   # ranges 0-1, 0.5 = no effect
+
+    return {
+        'group_a'        : label_a,
+        'group_b'        : label_b,
+        'n_a'            : n_a,
+        'n_b'            : n_b,
+        'median_a'       : group_a.median(),
+        'median_b'       : group_b.median(),
+        'delta'          : delta,
+        'cles'           : cles,           # effect size: >0.56 small, >0.64 medium, >0.71 large
+        'p_value'        : p,
+        'practical_sig'  : abs(delta) >= meaningful_delta,  # is the difference meaningful?
+    }
+
+# ---------------------------------------------------------------------------
+# Private helpers
+# ---------------------------------------------------------------------------
+
+# For create_reference_set
+def _filter_samples(adata, obs_cond, min_completeness):
+    kept = []
+    for lab in LABS:
+        lab_obs = obs_cond[obs_cond['plate_idx'] == lab]
+        if lab_obs.empty:
+            continue
+
+        idx    = [adata.obs.index.get_loc(s) for s in lab_obs.index]
+        X_lab  = adata.X[idx, :]
+
+        # Only consider proteins observed in at least one sample in this lab
+        detected_in_lab = np.sum(~np.isnan(X_lab), axis=0) > 0
+        X_lab_filtered  = X_lab[:, detected_in_lab]
+
+        # Threshold = min_completeness × number of proteins detectable in this lab
+        n_detectable = detected_in_lab.sum()
+        n_proteins   = np.sum(~np.isnan(X_lab_filtered), axis=1)
+        threshold    = min_completeness * n_detectable
+
+        kept.extend(lab_obs.index[n_proteins >= threshold])
+    return kept
+
+
+def _compute_lab_completeness(adata, obs_filtered):
+    completeness = {}
+    for lab in LABS:
+        lab_obs = obs_filtered[obs_filtered['plate_idx'] == lab]
+        if lab_obs.empty:
+            continue
+        idx = [adata.obs.index.get_loc(s) for s in lab_obs.index]
+        X   = adata.X[idx, :]
+        completeness[lab] = np.sum(~np.isnan(X), axis=0) / len(idx)
+    return completeness
+
+
+def _equalise_missingness(X, current_miss, target_miss, rng):
+    n_masked = []
+    for p in range(X.shape[1]):
+        n_to_mask = int(round((target_miss[p] - current_miss[p]) * X.shape[0]))
+        if n_to_mask > 0:
+            observed  = np.where(~np.isnan(X[:, p]))[0]
+            mask_idx  = rng.choice(observed, size=n_to_mask, replace=False)
+            X[mask_idx, p] = np.nan
+        n_masked.append(n_to_mask)
+    return X, n_masked
+
+# For compute_pairwise_correlations
+def _build_condition_matrix(
+    cond_data: dict,
+    adata,
+) -> tuple[np.ndarray, pd.DataFrame]:
+    """Concatenate per-lab matrices and build sample metadata."""
+    X_list, meta = [], []
+
+    for lab in LABS:
+        if lab not in cond_data:
+            continue
+        X_lab      = cond_data[lab]
+        instrument = (adata.obs[adata.obs['plate_idx'] == lab]['instrument_type'].iloc[0]
+                      if 'instrument_type' in adata.obs.columns else 'unknown')
+
+        meta.extend([{'lab': lab, 'instrument_type': instrument}] * X_lab.shape[0])
+        X_list.append(X_lab)
+
+    return np.concatenate(X_list, axis=0), pd.DataFrame(meta).reset_index(drop=True)
+
+
+def _precompute_transforms(
+    X: np.ndarray,
+    methods: list[str],
+) -> np.ndarray | None:
+    """Precompute ranked matrix for Spearman correlation."""
+    if 'spearman' not in methods:
+        return None
+
+    X_ranked = np.full_like(X, np.nan, dtype=float)
+    for p in range(X.shape[1]):
+        col      = X[:, p]
+        observed = ~np.isnan(col)
+        if observed.sum() > 1:
+            X_ranked[observed, p] = rankdata(col[observed])
+
+    return X_ranked
+
+
+def _compute_pairs(
+    X_all:    np.ndarray,
+    X_ranked: np.ndarray | None,
+    meta_df:  pd.DataFrame,
+    cond:     str,
+    methods:  list[str],
+    min_coobserved: int,
+) -> list[dict]:
+    """Iterate over all sample pairs and compute correlations."""
+    n_total = X_all.shape[0]
+    records = []
+
+    for i in tqdm(range(n_total), desc=cond):
+        lab_i  = meta_df.loc[i, 'lab']
+        inst_i = meta_df.loc[i, 'instrument_type']
+
+        for j in range(i + 1, n_total):
+            lab_j  = meta_df.loc[j, 'lab']
+            inst_j = meta_df.loc[j, 'instrument_type']
+
+            record = {
+                'sample_i'       : i,
+                'sample_j'       : j,
+                'lab_i'          : lab_i,
+                'lab_j'          : lab_j,
+                'instrument_i'   : inst_i,
+                'instrument_j'   : inst_j,
+                'condition'      : cond,
+                'same_lab'       : lab_i == lab_j,
+                'same_instrument': inst_i == inst_j,
+                'lab_pair'       : '__'.join(sorted([lab_i, lab_j])),
+                'comparison_type': (
+                    'intra_lab'                 if lab_i == lab_j  else
+                    'inter_lab_same_instrument' if inst_i == inst_j else
+                    'inter_lab_diff_instrument'
+                ),
+            }
+
+            if 'spearman' in methods:
+                obs       = ~np.isnan(X_ranked[i]) & ~np.isnan(X_ranked[j])
+                n_coobs   = obs.sum()
+                record['n_coobserved'] = n_coobs
+                record['spearman']     = (
+                    spearmanr(X_ranked[i, obs], X_ranked[j, obs])[0]
+                    if n_coobs >= min_coobserved else np.nan
+                )
+
+            if 'pearson' in methods:
+                obs_log          = ~np.isnan(X_all[i]) & ~np.isnan(X_all[j])
+                n_coobs_log      = obs_log.sum()
+                record['n_coobserved_pearson'] = n_coobs_log
+                record['pearson'] = (
+                    np.corrcoef(X_all[i, obs_log], X_all[j, obs_log])[0, 1]
+                    if n_coobs_log >= min_coobserved else np.nan
+                )
+
+            if any(not np.isnan(record.get(m, np.nan)) for m in methods):
+                records.append(record)
+
+    return records
