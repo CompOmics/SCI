@@ -218,7 +218,7 @@ def read_cellenONE(folder: str) -> pd.DataFrame:
             df["comment[Plate Number]"] = plate_nr
             df["comment[Sample Type]"]  = sample_type
             df["image_path"]            = df["ImageFile"].apply(
-                lambda x: os.path.join(isolated_path, x.split('"')[1])
+                lambda x: os.path.join(os.path.dirname(isolated_path), x.split('"')[1])
             )
             records.append(df)
 
@@ -229,6 +229,7 @@ def read_cellenONE(folder: str) -> pd.DataFrame:
 
     # Drop unnamed index columns and rename position columns to SDRF convention
     merged = merged.loc[:, ~merged.columns.str.startswith("Unnamed")]
+    merged['YPos'] = merged['YPos'].apply(lambda x: 25-x)
     merged = merged.rename(columns={
         "XPos": "comment[X position]",
         "YPos": "comment[Y position]",
