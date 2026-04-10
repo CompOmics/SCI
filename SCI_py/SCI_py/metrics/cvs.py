@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import warnings
 
 def compute_cv_matrix(adata, conditions, layer=''):
     cvs_list = []
@@ -10,9 +11,12 @@ def compute_cv_matrix(adata, conditions, layer=''):
             X_sub = adata[group_samples.index, :].layers[layer]
         else:
             X_sub = adata[group_samples.index, :].X
-        col_means = np.nanmean(X_sub, axis=0)
-        col_stds  = np.nanstd(X_sub, axis=0, ddof=1)
-        n_valid   = np.sum(~np.isnan(X_sub), axis=0)
+        
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            col_means = np.nanmean(X_sub, axis=0)
+            col_stds  = np.nanstd(X_sub, axis=0, ddof=1)
+            n_valid   = np.sum(~np.isnan(X_sub), axis=0)
 
         mask = n_valid > 1
         cvs = (col_stds[mask] / col_means[mask]) * 100

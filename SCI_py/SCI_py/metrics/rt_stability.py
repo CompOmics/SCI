@@ -1,27 +1,22 @@
 import pandas as pd
 
 def compute_rt_proportions(
-    report,
-    sample_ids:   "pd.Index | list",
-    rt_col:       str,
-    conditions:   list[str] | None = None,
-    bins:         int              = 20,
-    normalize_rt: bool             = False,
+    adata,
+    rt_layer:     str,
+    bins:         int = 20,
+    normalize_rt: bool = False,
 ) -> pd.DataFrame:
     """
     Compute per-sample retention time proportion distributions.
 
     Parameters
     ----------
-    report:
-        Long-format report DataFrame with columns ``sample_id``,
-        ``source name``, ``plate_idx``, and ``rt_col``.
-    sample_ids:
-        Sample IDs to include.
-    rt_col:
-        Column containing retention time values.
-    conditions:
-        Source names to include.  ``None`` includes all.
+    adata:
+        AnnData object. Retention times are taken from ``adata.layers[rt_layer]``,
+        with shape (cells × features). ``adata.obs`` must contain
+        ``source name`` and ``plate_idx``.
+    rt_layer:
+        Key in ``adata.layers`` containing retention time values.
     bins:
         Number of RT bins.
     normalize_rt:
@@ -33,29 +28,40 @@ def compute_rt_proportions(
         Long-format table with columns ``sample_id``, ``source name``,
         ``plate_idx``, ``bin_mid``, and ``proportion``.
     """
-    mask = report['sample_id'].isin(sample_ids)
-    if conditions is not None:
-        mask &= report['source name'].isin(conditions)
+    import numpy as np
 
-    df = report[mask].copy()
+    X     = adata.layers[rt_layer]
+    if hasattr(X, 'toarray'):
+        X = X.toarray()
 
-    if normalize_rt:
-        rt_min = df.groupby('sample_id')[rt_col].transform('min')
-        rt_max = df.groupby('sample_id')[rt_col].transform('max')
-        df[rt_col] = (df[rt_col] - rt_min) / (rt_max - rt_min)
+    obs   = adata.obs[['source name', 'plate_idx']].copy()
 
-    df['bin_edges'] = pd.cut(df[rt_col], bins=bins)
+    rows = []
+    for i, sample_id in enumerate(adata.obs_names):
+        rt_vals = X[i, :]
+        rt_vals = rt_vals[~np.isnan(rt_vals)]
+        if len(rt_vals) == 0:
+            continue
 
-    mapping = df[['sample_id', 'source name', 'plate_idx']].drop_duplicates().set_index('sample_id')
+        if normalize_rt:
+            rt_min, rt_max = rt_vals.min(), rt_vals.max()
+            if rt_max > rt_min:
+                rt_vals = (rt_vals - rt_min) / (rt_max - rt_min)
 
-    props = (
-        df.groupby('sample_id')['bin_edges']
-          .value_counts(normalize=True)
-          .rename('proportion')
-          .reset_index()
-    )
-    props['bin_mid']     = props['bin_edges'].apply(lambda x: x.mid)
-    props['source name'] = props['sample_id'].map(mapping['source name'])
-    props['plate_idx']   = props['sample_id'].map(mapping['plate_idx'])
+        counts, edges = np.histogram(rt_vals, bins=bins)
+        bin_mids      = (edges[:-1] + edges[1:]) / 2
+        proportions   = counts / counts.sum()
 
-    return props
+        source = obs.at[sample_id, 'source name']
+        plate  = obs.at[sample_id, 'plate_idx']
+
+        for mid, prop in zip(bin_mids, proportions):
+            rows.append({
+                'sample_id':   sample_id,
+                'source name': source,
+                'plate_idx':   plate,
+                'bin_mid':     mid,
+                'proportion':  prop,
+            })
+
+    return pd.DataFrame(rows)

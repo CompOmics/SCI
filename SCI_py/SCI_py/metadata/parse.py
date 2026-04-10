@@ -18,6 +18,7 @@ Typical usage
 from __future__ import annotations
 
 import pandas as pd
+from typing import Callable
 
 from ..constants.metadata import (
     _X_TO_COL,
@@ -99,7 +100,7 @@ def _filename_BYU(filename: str) -> str:
 
 
 #: Maps plate ID → filename normalisation function.
-FILENAME_CONVERTERS: dict[str, object] = {
+FILENAME_CONVERTERS: dict[str, Callable] = {
     "DTU_Astral_1"   : _filename_default,
     "LSMBO_Astral_1" : _filename_default,
     "KI_Astral_1"    : _filename_KI,

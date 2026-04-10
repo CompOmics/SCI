@@ -3,14 +3,14 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 from ..constants.plotting import CONDITION_ORDER, LAB_ORDER, LAB_COLORS, CONDITION_COLORS
-from .utilities import _save, _save_legend
+from .utilities import _save, _save_legend, _save_legend_from_mapping
 
 import numpy as np
 import matplotlib.gridspec as gridspec
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 import pandas as pd
-
+import warnings
 
 def _metric_label(count_col: str) -> str:
     _METRIC_LABELS = {
@@ -117,11 +117,13 @@ def plot_counts_overview(
         ax.get_legend().remove()
         axes = [ax]
 
-    fig.tight_layout()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        fig.tight_layout()
 
     if save_dir:
         _save(fig, os.path.join(save_dir, filename))
-        _save_legend(axes[0], save_dir)
+        _save_legend_from_mapping(LAB_COLORS, save_dir, title='Lab')
 
     if show:
         plt.show()

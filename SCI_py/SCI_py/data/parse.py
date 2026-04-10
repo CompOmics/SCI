@@ -64,14 +64,26 @@ def align_obs_across_anndata(
     obs_all = (obs_1.reindex(all_samples)
                     .combine_first(obs_2.reindex(all_samples)))
 
+    def _align_layers(adata, X_aligned):
+        return {
+            key: pd.DataFrame(
+                layer.toarray() if hasattr(layer, 'toarray') else layer,
+                index   = adata.obs_names,
+                columns = adata.var_names,
+            ).reindex(X_aligned.index)
+            for key, layer in adata.layers.items()
+        }
+
     adata_1 = anndata.AnnData(
-        X   = X_1_aligned,
-        obs = obs_all.loc[X_1_aligned.index],
-        var = var_1
+        X      = X_1_aligned,
+        obs    = obs_all.loc[X_1_aligned.index],
+        var    = var_1,
+        layers = _align_layers(adata_1, X_1_aligned),
     )
     adata_2 = anndata.AnnData(
-        X   = X_2_aligned,
-        obs = obs_all.loc[X_2_aligned.index],
-        var = var_2
+        X      = X_2_aligned,
+        obs    = obs_all.loc[X_2_aligned.index],
+        var    = var_2,
+        layers = _align_layers(adata_2, X_2_aligned),
     )
     return adata_1, adata_2

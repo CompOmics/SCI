@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from ..constants.plotting import CONDITION_ORDER, LAB_ORDER, LAB_COLORS, CONDITION_COLORS
-from .utilities import _save, _save_legend
+from .utilities import _save, _save_legend, _save_legend_from_mapping
 
 def plot_cvs_overview(
     cvs,
@@ -78,7 +78,7 @@ def plot_cvs_overview(
 
     if save_dir:
         _save(fig, os.path.join(save_dir, filename))
-        _save_legend(axes[0], save_dir, 'legend_cvs.png')
+        _save_legend_from_mapping(LAB_COLORS, save_dir, title='Lab', filename='legend_cvs.png')
 
     plt.show() if show else plt.close(fig)
 
