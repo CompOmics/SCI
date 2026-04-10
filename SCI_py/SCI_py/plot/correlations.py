@@ -118,14 +118,14 @@ def plot_masking_heatmap(
 
 
 def plot_missingness_distributions(
-    masked_data:  dict,
-    condition:    str,
-    level: str = 'protein',
+    masked_data:   dict,
+    conditions:    list[str],
+    level:         str        = 'protein',
     reference_lab: str | None = None,
-    xlim_max: float = .5,
-    save_dir:     str | None  = None,
-    filename:     str         = 'missingness_distributions.png',
-    show:         bool        = True,
+    xlim_max:      float      = .5,
+    save_dir:      str | None = None,
+    filename:      str        = 'missingness_distributions.png',
+    show:          bool       = True,
 ) -> pd.DataFrame:
     """
     Plot per-protein missingness distributions across labs after masking
@@ -139,8 +139,8 @@ def plot_missingness_distributions(
     ----------
     masked_data:
         Output of ``create_reference_set``.
-    condition:
-        Condition to visualise.
+    conditions:
+        Conditions to visualise. Data is pooled across conditions.
     level:
         protein or sample.
     reference_lab:
@@ -159,25 +159,24 @@ def plot_missingness_distributions(
     -------
     pd.DataFrame
         KS test results with columns ``lab_a``, ``lab_b``,
-        ``ks_stat``, ``p_value``, ``sig``.
+        ``ks_stat``, ``p_value``, ``p_value_bh``, ``sig``.
     """
     if level not in ('protein', 'sample'):
         raise ValueError("level must be 'protein' or 'sample'")
 
-    labs = [l for l in LAB_ORDER if l in masked_data.get(condition, {})]
-    if not labs:
-        print(f'No data for condition {condition}')
-        return pd.DataFrame()
+    axis = 0 if level == 'protein' else 1
 
-    # axis=0 → per-protein (fraction of samples missing)
-    # axis=1 → per-sample  (fraction of proteins missing)
-    axis       = 0 if level == 'protein' else 1
+    # Pool missingness across conditions per lab
+    labs = [l for l in LAB_ORDER if any(l in masked_data.get(c, {}) for c in conditions)]
 
-    missingness = {
-        lab: 1 - np.sum(~np.isnan(masked_data[condition][lab]), axis=axis)
-             / masked_data[condition][lab].shape[axis]
-        for lab in labs
-    }
+    missingness = {}
+    for lab in labs:
+        arrays = [
+            1 - np.sum(~np.isnan(masked_data[c][lab]), axis=axis)
+                / masked_data[c][lab].shape[axis]
+            for c in conditions if lab in masked_data.get(c, {})
+        ]
+        missingness[lab] = np.concatenate(arrays)
 
     pairs = (
         [(reference_lab, lb) for lb in labs if lb != reference_lab]
@@ -189,8 +188,6 @@ def plot_missingness_distributions(
         ks_records.append({'lab_a': la, 'lab_b': lb, 'ks_stat': stat, 'p_value': p})
 
     ks_df = pd.DataFrame(ks_records)
-
-    # Multiple testing correction
     _, p_corrected, _, _ = multipletests(ks_df['p_value'], method='fdr_bh')
     ks_df['p_value_bh'] = p_corrected
     ks_df['sig']        = ks_df['p_value_bh'].apply(
@@ -198,14 +195,12 @@ def plot_missingness_distributions(
                   else '*' if p < 0.05 else 'ns'
     )
 
-    # --- Plot ---
     fig, axes = plt.subplots(1, 2, figsize=(14, 5), constrained_layout=True)
 
     ax = axes[0]
     for lab in labs:
         sns.kdeplot(missingness[lab], ax=ax, color=LAB_COLORS.get(lab, 'grey'),
                     linewidth=1.8, label=lab, fill=True, alpha=0.08)
-        
     xlabel = ('Per-protein missingness fraction' if level == 'protein'
               else 'Per-sample missingness fraction')
     ax.set(xlabel=xlabel, ylabel='Density',
@@ -239,8 +234,9 @@ def plot_missingness_distributions(
     ax.tick_params(axis='x', rotation=45)
     ax.tick_params(axis='y', rotation=0)
 
+    cond_label = ', '.join(conditions)
     fig.suptitle(
-        f'Missingness equalisation validation ({level}-level) — {condition}\n'
+        f'Missingness equalisation validation ({level}-level) — {cond_label}\n'
         f'ns = FDR-corrected p ≥ 0.05',
         fontweight='bold',
     )
@@ -347,12 +343,6 @@ def plot_coobserved_diagnostic(
     if save_dir:
         _save(fig, f'{save_dir}/{filename}')
     plt.show() if show else plt.close(fig)
-
-    # Summary statistics
-    for cond in conditions:
-        df = correlation_results[cond]
-        print(f'\n{cond}:')
-        print(df.groupby('comparison_type')[n_coobs_col].describe().round(1))
 
 
 def plot_intralab_correlation(

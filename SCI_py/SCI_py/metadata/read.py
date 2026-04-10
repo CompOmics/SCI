@@ -214,6 +214,7 @@ def read_cellenONE(folder: str) -> pd.DataFrame:
                 continue
 
             isolated_path = hits[0]
+            print(isolated_path)
             df            = pd.read_csv(isolated_path, sep="\t")
             df["comment[Plate Number]"] = plate_nr
             df["comment[Sample Type]"]  = sample_type
