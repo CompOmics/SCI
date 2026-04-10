@@ -7,6 +7,7 @@ import matplotlib.lines as mlines
 import seaborn as sns
 from matplotlib.colors import TwoSlopeNorm
 from scipy.stats import linregress
+from scipy.stats import spearmanr
 
 from ..constants.plotting import CONDITION_ORDER, CONDITION_COLORS, LAB_COLORS, LAB_ORDER
 from .utilities import _save, _save_legend
@@ -296,7 +297,7 @@ def plot_drift_significance(
         pivot = (stats_df[stats_df['adata_type'] == adata_type]
                  .pivot_table(index='lab', columns='condition',
                               values='p_value_bh', aggfunc='min'))
-        annot = pivot.applymap(lambda p:
+        annot = pivot.map(lambda p:
             f'{p:.3f} (***)' if p < 0.001 else
             f'{p:.3f} (**)' if p < 0.01  else
             f'{p:.3f} (*)'  if p < 0.05  else
@@ -324,6 +325,146 @@ def plot_drift_significance(
     plt.show() if show else plt.close(fig)
 
 
+def plot_rt_drift_correlations(
+    correlation_dict: dict,
+    save_dir:         str | None = None,
+    filename:         str        = 'rt_drift_correlations.png',
+    show:             bool       = True,
+):
+    """
+    Plot per-lab Spearman correlation distributions of RT drift.
+
+    Parameters
+    ----------
+    correlation_dict:
+        Dict mapping lab name → DataFrame with ``spearman_r`` column,
+        as returned by ``compute_rt_drift_correlations``.
+    save_dir:
+        Directory for saved figures.
+    filename:
+        Output filename.
+    show:
+        Whether to call ``plt.show()``.
+    """
+    n_labs = len(correlation_dict)
+    ncols  = 2
+    nrows  = (n_labs + 1) // ncols
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=(12, 3.5 * nrows),
+                             constrained_layout=True)
+    axes = axes.flatten()
+
+    for ax, (lab_name, correlations) in zip(axes, correlation_dict.items()):
+        sns.boxplot(
+            data       = correlations,
+            x          = 'spearman_r',
+            ax         = ax,
+            color      = LAB_COLORS.get(lab_name, 'steelblue'),
+            width      = 0.4,
+            flierprops = dict(marker='o', markersize=2, alpha=0.4),
+        )
+        ax.axvline(0, color='black', linewidth=0.8, linestyle='--')
+        ax.set(title=lab_name, xlabel='Spearman ρ', ylabel='', xlim=(-1, 1))
+        ax.spines[['top', 'right']].set_visible(False)
+
+    for ax in axes[n_labs:]:
+        ax.set_visible(False)
+
+    fig.suptitle('RT drift correlations per lab', fontweight='bold')
+
+    if save_dir:
+        _save(fig, f'{save_dir}/{filename}')
+
+    plt.show() if show else plt.close(fig)
+
+def plot_rt_drift_precursor(
+    adata,
+    precursor:  str,
+    rt_layer: str = 'EG.ApexRT',
+    correlation_col = 'injection_order',
+    color_by:   str       = 'source name',
+    palette:    dict | None = None,
+    title:      str | None  = None,
+    save_dir:   str | None  = None,
+    filename:   str | None  = None,
+    show:       bool        = True,
+):
+    """
+    Dotplot of apex RT vs injection order for a single precursor.
+
+    Parameters
+    ----------
+    adata_precursor:
+        Precursor-level AnnData.
+    precursor:
+        Precursor ID (must be in ``adata.var_names``).
+    lab_name:
+        Lab (plate_idx) to subset.
+    conditions:
+        Source names to include.
+    color_by:
+        obs column to colour dots by.
+    palette:
+        Dict mapping color_by values to colors. Falls back to color cycle if None.
+    title:
+        Figure title. Auto-generated if None.
+    save_dir:
+        Directory to save figure.
+    filename:
+        Output filename. Defaults to ``rt_drift_{precursor}.png``.
+    show:
+        Whether to call ``plt.show()``.
+    """
+    BUILTIN = {'source name': CONDITION_COLORS, 'plate_idx': LAB_COLORS}
+
+    if precursor not in adata.var_names:
+        raise ValueError(f"Precursor '{precursor}' not found in adata.var_names.")
+
+    idx     = adata.var_names.get_loc(precursor)
+    X       = adata.layers[f'{rt_layer}']
+    rt_vals = (X[:, idx].toarray().flatten() if hasattr(X, 'toarray')
+               else np.array(X[:, idx], dtype=float).flatten())
+    rt_vals[rt_vals == 0] = np.nan
+
+    obs             = adata.obs.copy()
+    obs['_rt']      = rt_vals
+    obs             = obs.dropna(subset=['_rt'])
+    correlation_col_vals = obs[f'{correlation_col}'].values
+    rt              = obs['_rt'].values
+
+    _palette = (
+        BUILTIN.get(color_by)
+        or palette
+        or dict(zip(
+            obs[color_by].unique(),
+            plt.rcParams['axes.prop_cycle'].by_key()['color'],
+        ))
+    )
+    colors = obs[color_by].map(_palette).fillna('black')
+
+    r, p = spearmanr(correlation_col_vals, rt)
+
+    fig, ax = plt.subplots(figsize=(7, 4), constrained_layout=True)
+    ax.scatter(correlation_col_vals, rt, c=colors, s=18, alpha=0.7, linewidths=0)
+    ax.set(
+        xlabel = 'Injection order',
+        ylabel = 'Apex RT (min)',
+        title  = title or f'{precursor}  |  ρ = {r:.3f},  p = {p:.2e}  |  n = {len(rt)}',
+    )
+    ax.spines[['top', 'right']].set_visible(False)
+
+    # legend
+    for label, color in _palette.items():
+        if label in obs[color_by].values:
+            ax.scatter([], [], c=color, s=18, label=label)
+    ax.legend(title=color_by, frameon=False, fontsize=8)
+
+    if save_dir:
+        fname = filename or f'rt_drift_{precursor}.png'
+        _save(fig, f'{save_dir}/{fname}')
+
+    plt.show() if show else plt.close(fig)
+    
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
