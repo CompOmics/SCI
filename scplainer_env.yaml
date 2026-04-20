@@ -1,0 +1,45 @@
+name: r45_scp
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # Python
+  - python=3.14
+  - numpy
+  - pandas
+  - scipy
+  - anndata
+  - h5py
+  - zarr
+  - matplotlib
+  - seaborn
+  - tqdm
+  - ipykernel
+
+  # R base
+  - r-base=4.5
+  - r-reticulate
+
+  # Bioconductor - SCP core
+  - bioconductor-scp
+  - bioconductor-qfeatures
+  - bioconductor-singlecellexperiment
+  - bioconductor-summarizedexperiment
+  - bioconductor-scater
+  - bioconductor-scuttle
+  - bioconductor-biocparallel
+  - bioconductor-zellkonverter
+  - bioconductor-omicsgmf
+
+  # R plotting & utilities
+  - r-ggplot2
+  - r-dplyr
+  - r-tidyr
+  - r-seurat
+  - r-patchwork
+  - r-cowplot
+  - r-ggrepel
+  - r-pheatmap
+  - r-viridis
+  - r-anndata
