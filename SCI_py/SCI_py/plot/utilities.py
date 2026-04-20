@@ -1,6 +1,10 @@
 import os
+import matplotlib
 from matplotlib import pyplot as plt
 import warnings
+
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
 
 
 def _save(fig, path: str) -> None:
