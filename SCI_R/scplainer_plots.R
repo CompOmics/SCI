@@ -283,3 +283,68 @@ plot_gmf_embedding <- function(
 
     invisible(fig)
 }
+
+
+plot_silhouette_scores <- function(
+    stage_list,
+    col_bio   = COL_BIO,
+    col_batch = COL_BATCH,
+    save_dir  = NULL,
+    filename  = "silhouette_scores",
+    width     = 9,
+    height    = 5,
+    show      = TRUE
+) {
+    sil_results <- lapply(names(stage_list), function(nm) {
+        cat(sprintf("  Computing silhouettes: %s...\n", nm))
+        flush.console()
+        res       <- compute_silhouettes(stage_list[[nm]])
+        res$stage <- nm
+        res
+    }) %>% bind_rows()
+
+    sil_results$stage <- factor(sil_results$stage, levels = names(stage_list))
+
+    cat("\nSilhouette scores per correction stage:\n")
+    print(sil_results[, c("stage", "bio_silhouette", "batch_silhouette")])
+
+    sil_long <- rbind(
+        data.frame(stage      = sil_results$stage,
+                   metric     = "Biological separation (source.name)",
+                   silhouette = sil_results$bio_silhouette),
+        data.frame(stage      = sil_results$stage,
+                   metric     = "Batch structure (plate_idx)",
+                   silhouette = sil_results$batch_silhouette)
+    )
+    sil_long$stage <- factor(sil_long$stage, levels = names(stage_list))
+
+    fig <- ggplot(sil_long, aes(x = stage, y = silhouette, fill = metric)) +
+        geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+        geom_hline(yintercept = 0, linetype = "dashed", colour = "grey40") +
+        scale_fill_manual(values = c(
+            "Biological separation (source.name)" = col_bio,
+            "Batch structure (plate_idx)"         = col_batch
+        )) +
+        labs(
+            title    = "Silhouette scores across correction stages",
+            subtitle = "First 4 GMF components; higher bio + lower batch = better correction",
+            x        = NULL,
+            y        = "Mean silhouette width",
+            fill     = NULL
+        ) +
+        theme(
+            axis.text.x     = element_text(angle = 25, hjust = 1),
+            legend.position = "top"
+        )
+
+    if (!is.null(save_dir)) {
+        save_figure(fig, file.path(save_dir, filename), width = width, height = height)
+    }
+
+    if (show) {
+        options(repr.plot.width = width, repr.plot.height = height)
+        print(fig)
+    }
+
+    invisible(fig)
+}
