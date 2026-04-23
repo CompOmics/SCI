@@ -53,14 +53,6 @@ R -e "install.packages('IRkernel', repos='https://cloud.r-project.org')"
 R -e "IRkernel::installspec(name='r45_scp_r', displayname='R (r45_scp)')"
 ```
 
-## 4b. Install Bioconductor-only R packages
-
-Some packages are not available via conda and must be installed manually from Bioconductor:
-
-```bash
-R -e "if (!requireNamespace('BiocManager', quietly=TRUE)) install.packages('BiocManager'); BiocManager::install(c('omicsGMF', 'sgdGMF'))"
-```
-
 ---
 
 ## 5. Verify the kernels are registered

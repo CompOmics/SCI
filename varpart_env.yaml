@@ -1,0 +1,42 @@
+name: r44_varpart
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # Python
+  - python=3.14
+  - numpy
+  - pandas
+  - scipy
+  - anndata
+  - h5py
+  - zarr
+  - ipykernel
+
+  # R base
+  - r-base=4.4
+  - r-reticulate
+
+  # Bioconductor — variancePartition core
+  - bioconductor-variancepartition
+  - bioconductor-biocparallel
+  - bioconductor-limma
+  - bioconductor-biobase
+
+  # R utilities
+  - r-anndata
+  - r-lme4
+  - r-lmertest
+  - r-ggplot2
+  - r-cowplot
+  - r-patchwork
+  - r-dplyr
+  - r-tidyr
+  - r-tibble
+  - r-pheatmap
+  - r-rcolorbrewer
+  - r-scales
+  - r-here
+  - r-svglite
+  - r-reformulas
