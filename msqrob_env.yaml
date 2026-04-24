@@ -1,0 +1,41 @@
+name: r45_msqrob
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # Python
+  - python=3.14
+  - numpy
+  - pandas
+  - anndata
+  - h5py
+  - zarr
+  - ipykernel
+
+  # R base
+  - r-base=4.5
+  - r-reticulate
+
+  # Bioconductor — core
+  - bioconductor-msqrob2
+  - bioconductor-scp
+  - bioconductor-qfeatures
+  - bioconductor-singlecellexperiment
+
+  # R utilities
+  - r-dplyr
+  - r-tidyr
+  - r-purrr
+  - r-reshape2
+  - r-ggplot2
+  - r-ggrepel
+  - r-gridextra
+  - r-patchwork
+  - r-scales
+  - r-rcolorbrewer
+  - r-svglite
+  - r-here
+  - r-lubridate
+  - r-upsetr
+  - r-anndata
