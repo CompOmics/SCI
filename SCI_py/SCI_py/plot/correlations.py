@@ -350,6 +350,7 @@ def plot_intralab_correlation(
     method:   str        = 'spearman',
     save_dir: str | None = None,
     filename_fmt: str    = '{cond}_{method}_intralab',
+    ylim: tuple          = (0,1),
     show:     bool       = True,
 ) -> None:
     """
@@ -374,7 +375,7 @@ def plot_intralab_correlation(
                        hue='lab_i', hue_order=lab_order,
                        palette=LAB_COLORS, inner='quartile', legend=False, ax=ax)
         ax.set(xlabel='Lab', ylabel=f'{method.capitalize()} correlation',
-               title=f'{cond} — intra-lab correlation')
+               title=f'{cond} — intra-lab correlation', ylim=ylim)
         ax.title.set_fontweight('bold')
         ax.tick_params(axis='x', rotation=45)
         ax.spines[['top', 'right']].set_visible(False)
@@ -387,6 +388,8 @@ def plot_intralab_correlation(
 def plot_interlab_correlation_heatmap(
     correlation_results: dict,
     method:       str        = 'spearman',
+    vmin: float              = 0.0,
+    vmax: float              = 1.0,
     save_dir:     str | None = None,
     filename_fmt: str        = '{cond}_{method}_interlab_heatmap.png',
     show:         bool       = True,
@@ -414,10 +417,9 @@ def plot_interlab_correlation_heatmap(
             if not sub.empty:
                 matrix.loc[la, lb] = matrix.loc[lb, la] = sub.median()
 
-        vmin = matrix.values[~np.isnan(matrix.values)].min()
         g = sns.clustermap(
             matrix.astype(float),
-            cmap='RdYlGn', vmin=vmin, vmax=1.0,
+            cmap='RdYlGn', vmin=vmin, vmax=vmax,
             annot=True, fmt='.3f',
             figsize=(max(8, len(all_labs) * 0.9),) * 2,
             linewidths=0.5, linecolor='white',
@@ -446,6 +448,7 @@ def plot_instrument_correlation(
     method:       str        = 'spearman',
     save_dir:     str | None = None,
     filename_fmt: str        = '{cond}_{method}_instrument.png',
+    ylim: tuple              = (0,1),
     show:         bool       = True,
 ) -> None:
     """
@@ -479,7 +482,7 @@ def plot_instrument_correlation(
             rotation=30, ha='right',
         )
         ax.set(xlabel='', ylabel=f'{method.capitalize()} correlation',
-               title=f'{cond} — correlation by instrument type')
+               title=f'{cond} — correlation by instrument type', ylim=ylim)
         ax.title.set_fontweight('bold')
         ax.spines[['top', 'right']].set_visible(False)
 
