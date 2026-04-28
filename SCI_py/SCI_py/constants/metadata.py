@@ -1,3 +1,7 @@
+import os
+
+MAPPER_PATH = os.path.join(os.path.dirname(__file__), "mapper.csv")
+
 LAB_TO_PLATENR = {
     'BYU_timsTOF_1'  : -1,  # Unsure
     'Broad_timsTOF_1': 8,

@@ -2,6 +2,7 @@ import pandas as pd
 import os
 
 from ..metadata.parse import FILENAME_CONVERTERS, get_institute
+from ..constants.metadata import MAPPER_PATH
 
 def read_spectronaut(input_csv: str) -> pd.DataFrame:
     """
@@ -30,8 +31,7 @@ def read_spectronaut(input_csv: str) -> pd.DataFrame:
         input_data_frame = pd.read_csv(input_csv, low_memory=False, sep="\t", decimal=",")
     
     input_data_frame["FG.LabeledSequence"] = input_data_frame["FG.LabeledSequence"].str.strip("_")
-    mapper_path = os.path.join(os.path.dirname(__file__), "mapper.csv")
-    mapper_df = pd.read_csv(mapper_path).set_index("gene_name")
+    mapper_df = pd.read_csv(MAPPER_PATH).set_index("gene_name")
     mapper = mapper_df["description"].to_dict()
     input_data_frame["PG.ProteinGroups"] = input_data_frame["PG.ProteinGroups"].str.split(";")
     input_data_frame["PG.ProteinGroups"] = input_data_frame["PG.ProteinGroups"].map(
@@ -41,6 +41,7 @@ def read_spectronaut(input_csv: str) -> pd.DataFrame:
     return input_data_frame
 
 def load_spectronaut(path):
+    '''For the large table'''
     report = read_spectronaut(
         input_csv=path
     )

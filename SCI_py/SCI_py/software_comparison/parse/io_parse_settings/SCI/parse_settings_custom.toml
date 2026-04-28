@@ -1,0 +1,41 @@
+[mapper]
+"Proteins" = "Proteins"
+"Sequence" = "Sequence"
+"Charge" = "Charge"
+"Modified sequence" = "Modified sequence"
+
+
+[condition_mapper]
+"HYEA_QC_B13" = "B"
+"HYEA_QC_B14" = "B"
+"HYEA_QC_B15" = "B"
+"HYEA_QC_B16" = "B"
+"HYEA_QC_B17" = "B"
+"HYEA_QC_B18" = "B"
+"HYEA_QC_B19" = "B"
+"HYEA_QC_B20" = "B"
+"HYEA_QC_B21" = "B"
+"HYEA_QC_B22" = "B"
+"HYEA_QC_B23" = "B"
+"HYEB_QC_O10" = "A"
+"HYEB_QC_O11" = "A"
+"HYEB_QC_O12" = "A"
+"HYEB_QC_O2" = "A"
+"HYEB_QC_O3" = "A"
+"HYEB_QC_O4" = "A"
+"HYEB_QC_O5" = "A"
+"HYEB_QC_O6" = "A"
+"HYEB_QC_O7" = "A"
+"HYEB_QC_O8" = "A"
+"HYEB_QC_O9" = "A"
+
+[run_mapper]
+
+[species_mapper]
+"_YEAST" = "YEAST"
+"_ECOLI" = "ECOLI"
+"_HUMAN" = "HUMAN"
+
+[general]
+"contaminant_flag" = "Cont_"
+"decoy_flag" = true
