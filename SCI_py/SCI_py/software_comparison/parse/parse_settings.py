@@ -497,7 +497,8 @@ class ParseSettingsQuant:
         """
         zero_intensity_count = len(df[df["Intensity"] <= 0])
         if zero_intensity_count > 0:
-            print(f"WARNING: {zero_intensity_count} rows with 0 intensity were removed.")
+            pass
+            # print(f"WARNING: {zero_intensity_count} rows with 0 intensity were removed.")
         return df[df["Intensity"] > 0]
 
     def _format_by_analysis_level(self, df: pd.DataFrame) -> pd.DataFrame:

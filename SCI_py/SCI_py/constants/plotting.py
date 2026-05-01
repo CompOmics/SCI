@@ -46,3 +46,24 @@ LAB_ORDER = [
     'timsTOF_2',
     'timsTOF_3'
 ]
+
+SOFTWARE_COLORS = {
+    "MaxQuant": "#8bc6fd",
+    "AlphaPept": "#17212b",
+    "ProlineStudio": "#8b26ff",
+    "MSAngel": "#C0FA7D",
+    "FragPipe": "#F89008",
+    "i2MassChroQ": "#108E2E",
+    "Sage": "#E43924",
+    "WOMBAT": "#663200",
+    "DIA-NN": "#d42f2f",
+    "AlphaDIA": "#1D2732",
+    "Custom": "#000000",
+    "Spectronaut": "#007548",
+    "FragPipe (DIA-NN quant)": "#F89008",
+    "MSAID": "#bfef45",
+    "MetaMorpheus": "#637C7A",
+    "Proteome Discoverer": "#911eb4",
+    "PEAKS": "#f032e6",
+    "quantms": "#f5e830",
+}

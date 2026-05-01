@@ -17,7 +17,8 @@ search_settings_names = {
         '1': 'DirectDIA+',
         '2': 'DirectDIA+ method-evaluation',
         '3': 'Library (Astral + timsTOF)',
-        '4': 'Library'
+        '4': 'Library',
+        '5': 'The real method-evaluation'
     },
     'PEAKS':{
         '1': 'Recommended',
