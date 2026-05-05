@@ -541,64 +541,111 @@ plot_overlap_heatmap <- function(
     res_integrated,
     fdr_threshold = FDR_THRESHOLD,
     fc_threshold  = FC_THRESHOLD,
+    metric        = c("jaccard", "overlap", "logfc_cor"),
     save_dir      = NULL,
     filename      = "overlap_heatmap",
     width         = 8,
     height        = 7,
     show          = TRUE
 ) {
+    metric <- match.arg(metric)
+
     get_sig <- function(res) {
         res %>%
             filter(!is.na(adjPval), adjPval < fdr_threshold, abs(logFC) > fc_threshold) %>%
             pull(protein)
     }
 
-    sig_lists <- c(
-        list("Integrated" = get_sig(res_integrated)),
-        lapply(results_per_plate, get_sig)
-    )
+    all_results <- c(list("Integrated" = res_integrated), results_per_plate)
+    models      <- names(all_results)
+    n           <- length(models)
 
-    # compute pairwise Jaccard similarity
-    models  <- names(sig_lists)
-    n       <- length(models)
-    overlap <- matrix(0, nrow = n, ncol = n, dimnames = list(models, models))
+    # ── metric: logFC correlation ─────────────────────────────────────────────
+    if (metric == "logfc_cor") {
 
-    for (i in seq_len(n)) {
-        for (j in seq_len(n)) {
-            a <- sig_lists[[i]]
-            b <- sig_lists[[j]]
-            overlap[i, j] <- length(intersect(a, b)) /
-                              length(union(a, b))
+        # union of significant proteins across all models
+        sig_any      <- Reduce(union, lapply(all_results, get_sig))
+        cat(sprintf("logFC correlation computed on %d proteins (union of significant)\n",
+                    length(sig_any)))
+
+        # build protein x model logFC matrix, restricted to sig_any
+        logfc_mat <- sapply(all_results, function(res) {
+            v <- setNames(res$logFC, res$protein)
+            v[sig_any]
+        })
+        rownames(logfc_mat) <- sig_any
+
+        sim_mat      <- cor(logfc_mat, use = "pairwise.complete.obs", method = "spearman")
+        legend_label <- "Spearman\ncorrelation\n(logFC)"
+        limits       <- c(-1, 1)
+
+    # ── metric: jaccard or overlap coefficient ────────────────────────────────
+    } else {
+
+        sig_lists <- lapply(all_results, get_sig)
+
+        sim_mat <- matrix(0, nrow = n, ncol = n, dimnames = list(models, models))
+        for (i in seq_len(n)) {
+            for (j in seq_len(n)) {
+                a <- sig_lists[[i]]
+                b <- sig_lists[[j]]
+                inter <- length(intersect(a, b))
+                if (metric == "jaccard") {
+                    sim_mat[i, j] <- inter / length(union(a, b))
+                } else if (metric == "overlap") {
+                    denom <- min(length(a), length(b))
+                    sim_mat[i, j] <- if (denom == 0) 0 else inter / denom
+                }
+            }
         }
+        legend_label <- switch(metric,
+            jaccard = "Jaccard\nsimilarity",
+            overlap = "Overlap\ncoefficient"
+        )
+        limits <- c(0, 1)
     }
 
-    # cluster
-    hc       <- hclust(as.dist(1 - overlap))
-    ord      <- hc$order
-    ov_ord   <- overlap[ord, ord]
+    # ── cluster and reshape ───────────────────────────────────────────────────
+    hc     <- hclust(as.dist(1 - sim_mat))
+    ord    <- hc$order
+    sm_ord <- sim_mat[ord, ord]
 
-    df_long <- as.data.frame(ov_ord) %>%
+    df_long <- as.data.frame(sm_ord) %>%
         rownames_to_column("model_x") %>%
-        pivot_longer(-model_x, names_to = "model_y", values_to = "jaccard") %>%
+        pivot_longer(-model_x, names_to = "model_y", values_to = "sim") %>%
         mutate(
-            model_x = factor(model_x, levels = rownames(ov_ord)),
-            model_y = factor(model_y, levels = rownames(ov_ord))
+            model_x = factor(model_x, levels = rownames(sm_ord)),
+            model_y = factor(model_y, levels = rownames(sm_ord))
         )
 
-    fig <- ggplot(df_long, aes(x = model_x, y = model_y, fill = jaccard)) +
+    # annotation: set sizes (not shown for logfc_cor)
+    subtitle <- if (metric == "logfc_cor") {
+        sprintf("Spearman correlation of logFC restricted to %d proteins significant in ≥1 model",
+                length(sig_any))
+    } else {
+        "logFC Spearman correlation across all tested proteins"
+    }
+
+    # ── plot ──────────────────────────────────────────────────────────────────
+    title <- switch(metric,
+        jaccard  = "Overlap of significant proteins (Jaccard)",
+        overlap  = "Overlap of significant proteins (Overlap coefficient)",
+        logfc_cor = "logFC correlation across plates (Spearman)"
+    )
+
+    fig <- ggplot(df_long, aes(x = model_x, y = model_y, fill = sim)) +
         geom_tile(colour = "white", linewidth = 0.4) +
-        geom_text(aes(label = sprintf("%.2f", jaccard)), size = 2.8) +
+        geom_text(aes(label = sprintf("%.2f", sim)), size = 2.8) +
         scale_fill_distiller(palette = "RdYlBu", direction = 1,
-                             name = "Jaccard\nsimilarity",
-                             limits = c(0, 1)) +
-        labs(
-            title = "Overlap of significant proteins across plates",
-            x     = NULL,
-            y     = NULL
-        ) +
+                             name    = legend_label,
+                             limits  = limits) +
+        labs(title    = title,
+             subtitle = subtitle,
+             x = NULL, y = NULL) +
         theme(
             axis.text.x  = element_text(angle = 45, hjust = 1),
-            plot.title   = element_text(face = "bold")
+            plot.title   = element_text(face = "bold"),
+            plot.subtitle = element_text(size = 7, colour = "grey40")
         )
 
     if (!is.null(save_dir)) {
