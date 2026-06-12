@@ -29,6 +29,8 @@ dependencies:
   - r-dplyr
   - r-tidyr
   - r-purrr
+  - r-furrr
+  - r-future
   - r-reshape2
   - r-ggplot2
   - r-ggrepel

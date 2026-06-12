@@ -32,3 +32,5 @@ dependencies:
     - lxml
     - pyyaml
     - requests
+    - scib-metrics
+    - joblib

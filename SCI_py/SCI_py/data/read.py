@@ -69,3 +69,5 @@ def load_spectronaut(path):
     )
     return report
 
+def load_diann(input_csv: str) -> pd.DataFrame:
+    pd
