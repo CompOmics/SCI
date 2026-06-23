@@ -73,9 +73,3 @@ Figures/
 | Search engine overlap (UpSet + boxplots) | [Figure_2/overlap_error/](Figure_2/README.md#overlap-and-quantification-error) |
 
 ---
-
-## Notebook documentation
-
-See [../Notebooks/CLAUDE.md](../Notebooks/CLAUDE.md) for a complete mapping of notebooks
-to figure outputs, including the role of the `SCI_FIGURES_DIR` environment variable for
-toggling between DIA-NN and Spectronaut figure output.
