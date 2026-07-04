@@ -282,6 +282,287 @@ def plot_ma_per_tool(
     plt.show() if show else plt.close(fig)
 
 
+# ── MA-plots per tool, pooled over a set of labs ──────────────────────────────
+
+def plot_ma_multilab(
+    intermediates,
+    species_config,
+    species_colors,
+    labs,
+    tools                  = None,
+    ncols:           int   = 3,
+    xlim:            tuple = (-4, 5),
+    use_rank:        bool  = True,
+    point_size:      int   = 4,
+    alpha:           float = 0.25,
+    max_points_per_species = 20_000,
+    random_state:    int   = 0,
+    group_name:  str | None = None,
+    save_dir:  str | None  = None,
+    filename:  str         = 'ma_plots_multilab',
+    show:      bool        = True,
+):
+    """MA-plot per tool, pooling several labs into one panel.
+
+    Same representation as :func:`plot_ma_per_tool` (x = measured log2 FC,
+    coloured by species, expected per-species ratios as dotted vertical lines),
+    but combining a list of labs (e.g. all Astral labs, or all timsTOF labs).
+
+    Abundances are only comparable within a single lab, so the abundance rank is
+    computed **separately within each (lab, tool)** and only then are the points
+    pooled and plotted together. This keeps the per-lab error/rank calculation
+    intact while showing the instrument group as a single cloud per tool.
+
+    Parameters
+    ----------
+    labs:
+        Iterable of lab names to pool into one figure.
+    group_name:
+        Optional label for the pooled group (e.g. ``'Astral'``), used in the title.
+    use_rank:
+        If True, y = percentile rank (0-100) of mean log intensity within each
+        (lab, tool). If False, y = raw mean log intensity (only comparable within
+        a lab, so ranking is recommended when pooling labs).
+    max_points_per_species:
+        Down-sample each species (after pooling) to at most this many points.
+    """
+    labs = list(labs)
+    df = intermediates[intermediates['lab'].isin(labs)].copy()
+    if df.empty:
+        raise ValueError(f'No intermediates for labs {labs!r}.')
+    df['abundance'] = 0.5 * (df['log_Intensity_mean_A'] + df['log_Intensity_mean_B'])
+
+    if tools is None:
+        tools = sorted(df['search_engine'].unique())
+    species_list = [s for s in species_colors if s in df['species'].unique()]
+
+    # Rank computed per (lab, tool) so intensity scales stay comparable, then pooled.
+    if use_rank:
+        df['y'] = (
+            df.groupby(['lab', 'search_engine'])['abundance']
+            .rank(pct=True) * 100
+        )
+    else:
+        df['y'] = df['abundance']
+
+    nrows = ceil(len(tools) / ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols,
+        figsize=(4.6 * ncols, 4.0 * nrows),
+        sharex=True, sharey=use_rank, squeeze=False,
+    )
+    axes_flat = axes.ravel()
+
+    rng = np.random.default_rng(random_state)
+    for ax, tool in zip(axes_flat, tools):
+        sub = df[df['search_engine'] == tool]
+
+        for sp in species_list:
+            d = sub[sub['species'] == sp].dropna(subset=['log2_A_vs_B', 'y'])
+            if len(d) > max_points_per_species:
+                d = d.iloc[rng.choice(len(d), max_points_per_species, replace=False)]
+            ax.scatter(d['log2_A_vs_B'], d['y'], s=point_size, alpha=alpha,
+                       color=species_colors[sp], label=sp, linewidths=0, rasterized=True)
+
+        for sp in species_list:
+            exp = np.log2(species_config[sp]['A_vs_B'])
+            ax.axvline(exp, color=species_colors[sp], linestyle=':', linewidth=1.6, zorder=5)
+
+        ax.set_title(f'{tool}  (n={len(sub):,})', fontweight='bold', fontsize=10)
+        ax.set_xlim(xlim)
+        ax.spines[['top', 'right']].set_visible(False)
+
+    for ax in axes_flat[len(tools):]:
+        ax.set_visible(False)
+    for ax in axes[-1]:
+        ax.set_xlabel('measured log2 FC (A vs B)')
+    y_label = ('abundance rank (percentile, within lab/tool)' if use_rank
+               else 'mean log intensity (A, B)')
+    for ax in axes[:, 0]:
+        ax.set_ylabel(y_label)
+
+    handles = [
+        plt.Line2D([0], [0], marker='o', linestyle='', color=species_colors[s],
+                   label=s, markersize=7)
+        for s in species_list
+    ]
+    fig.legend(handles=handles, title='Species', bbox_to_anchor=(1.0, 0.5),
+               loc='center left', frameon=False)
+
+    group_txt = group_name if group_name else f'{len(labs)} labs'
+    fig.suptitle(
+        f'MA-plots per tool - abundance vs measured fold change  '
+        f'({group_txt}: {", ".join(labs)})',
+        fontweight='bold',
+    )
+    fig.tight_layout(rect=[0, 0, 0.93, 1])
+
+    if save_dir:
+        _save(fig, os.path.join(save_dir, filename))
+    plt.show() if show else plt.close(fig)
+
+
+# ── Multi-tool dynamic range, pooled over a set of labs ───────────────────────
+
+def plot_dynamic_range_multi(
+    intermediates,
+    species_colors,
+    labs,
+    tools,
+    color_map            = None,
+    species_order        = ('HUMAN', 'YEAST', 'ECOLI'),
+    match_on             = ('precursor ion',),
+    n_bins:  int         = 12,
+    min_per_bin:  int    = 20,
+    group_name:  str | None = None,
+    save_dir: str | None = None,
+    filename: str        = 'dynamic_range_multi',
+    show:     bool       = True,
+):
+    """Mean |error| vs abundance rank for a set of tools, pooled over a set of labs.
+
+    Generalises :func:`compare_tools_error` from two tools to an arbitrary list of
+    tools. For each lab the precursors are restricted to those quantified by **all**
+    requested tools (stringent overlap), the abundance rank is computed within that
+    lab, and only then are the matched precursors pooled across labs. Ranks, bins and
+    errors are therefore always computed per lab; pooling only affects what is drawn.
+
+    The figure has, per species column:
+
+    - **Top** - mean absolute error ``|epsilon|`` vs abundance rank, one line per
+      tool (with SEM band). The lowest line is the most accurate tool at that
+      abundance.
+    - **Bottom** - a thin band coloured by the tool with the lowest mean error in
+      each abundance bin (the winning tool across the dynamic range).
+
+    Parameters
+    ----------
+    labs:
+        Iterable of lab names. Ranks/bins/errors are computed separately per lab
+        and pooled for plotting.
+    tools:
+        Tools to compare (typically the recommended set shown in the MA-plots).
+    color_map:
+        ``{tool: color}``. Falls back to ``SOFTWARE_COLORS`` then the mpl cycle.
+    group_name:
+        Optional label for the pooled group (e.g. ``'Astral'``), used in the title.
+    """
+    labs     = list(labs)
+    tools    = list(tools)
+    match_on = list(match_on)
+
+    if color_map is None:
+        color_map = SOFTWARE_COLORS
+    cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    tool_color = {
+        t: color_map.get(t, cycle[i % len(cycle)])
+        for i, t in enumerate(tools)
+    }
+
+    err_cols = [f'abs_err__{t}' for t in tools]
+
+    per_lab = []
+    for lab in labs:
+        inter_lab = intermediates[intermediates['lab'] == lab]
+
+        merged = None
+        for tool in tools:
+            t = inter_lab[inter_lab['search_engine'] == tool][
+                match_on + ['species', 'epsilon',
+                            'log_Intensity_mean_A', 'log_Intensity_mean_B']
+            ].copy()
+            t['abund'] = _abundance(t)
+            t = t.dropna(subset=['epsilon', 'abund'])
+            keep_cols = match_on + ['epsilon', 'abund']
+            if merged is None:
+                keep_cols = match_on + ['species', 'epsilon', 'abund']
+            t = t[keep_cols].rename(
+                columns={'epsilon': f'eps__{tool}', 'abund': f'abund__{tool}'}
+            )
+            merged = t if merged is None else merged.merge(t, on=match_on, how='inner')
+
+        if merged is None or merged.empty:
+            continue
+
+        # Ranks computed within this lab over the fully matched precursor set.
+        rank_cols = []
+        for tool in tools:
+            rc = f'rank__{tool}'
+            merged[rc] = merged[f'abund__{tool}'].rank(pct=True) * 100
+            merged[f'abs_err__{tool}'] = merged[f'eps__{tool}'].abs()
+            rank_cols.append(rc)
+        merged['abundance'] = merged[rank_cols].mean(axis=1)
+        merged['lab'] = lab
+        per_lab.append(merged[['lab', 'species', 'abundance'] + err_cols])
+
+    if not per_lab:
+        raise ValueError(f'No precursors matched across all tools for labs {labs!r}.')
+
+    m = pd.concat(per_lab, ignore_index=True)
+
+    species_list = [s for s in species_order if s in m['species'].unique()]
+    n_sp = len(species_list)
+
+    fig, axes = plt.subplots(
+        2, n_sp, figsize=(5 * n_sp, 7), squeeze=False, sharex='col', sharey='row',
+        gridspec_kw={'height_ratios': [6, 1]},
+    )
+
+    group_txt = group_name if group_name else f'{len(labs)} labs'
+    print(f'Dynamic range ({group_txt}): {len(m):,} precursors matched across all '
+          f'{len(tools)} tools, pooled over {len(labs)} lab(s)')
+
+    for col, sp in enumerate(species_list):
+        d = m[m['species'] == sp].copy()
+        d['bin'] = pd.qcut(d['abundance'], n_bins, duplicates='drop')
+        g = d.groupby('bin', observed=True)
+        x = g['abundance'].median().values
+        keep = g.size().values >= min_per_bin
+
+        ax = axes[0, col]
+        mean_err = {}
+        for tool in tools:
+            mean_t = g[f'abs_err__{tool}'].mean().values
+            sem_t  = g[f'abs_err__{tool}'].sem().values
+            mean_err[tool] = mean_t
+            c = tool_color[tool]
+            ax.plot(x[keep], mean_t[keep], color=c, label=tool, linewidth=2)
+            ax.fill_between(x[keep], (mean_t - sem_t)[keep], (mean_t + sem_t)[keep],
+                            color=c, alpha=0.15)
+        ax.set_title(f'{sp}  (n={len(d):,})', fontweight='bold')
+        if col == 0:
+            ax.set_ylabel('mean |error|  (|measured - expected|)')
+            ax.legend(frameon=False, fontsize=8, ncol=1)
+        ax.spines[['top', 'right']].set_visible(False)
+
+        # Best-tool band: colour each bin by the tool with the lowest mean error.
+        band = axes[1, col]
+        intervals = list(g.groups.keys())
+        err_matrix = np.vstack([mean_err[t] for t in tools])  # (n_tools, n_bins)
+        best_idx = np.nanargmin(err_matrix, axis=0)
+        for j, iv in enumerate(intervals):
+            if not keep[j]:
+                continue
+            band.axvspan(iv.left, iv.right, color=tool_color[tools[best_idx[j]]],
+                         alpha=0.85, linewidth=0)
+        band.set_yticks([])
+        band.set_ylabel('best', fontsize=8, rotation=0, ha='right', va='center')
+        band.set_xlabel('abundance rank (percentile, matched precursors)')
+        band.spines[['top', 'right', 'left']].set_visible(False)
+
+    fig.suptitle(
+        f'Quantification error vs abundance across tools  ({group_txt}: {", ".join(labs)})\n'
+        f'(lower is better; bottom band = lowest-error tool per abundance bin)',
+        fontweight='bold',
+    )
+    fig.tight_layout()
+
+    if save_dir:
+        _save(fig, os.path.join(save_dir, filename))
+    plt.show() if show else plt.close(fig)
+    return m
+
+
 # ── Pairwise tool comparison ──────────────────────────────────────────────────
 
 def _abundance(df):
