@@ -290,7 +290,7 @@ def impute_missing_values(sdrf: pd.DataFrame) -> pd.DataFrame:
     """
     Impute missing values in the merged metadata table.
 
-    Three strategies are applied in order:
+    Two strategies are applied in order:
 
     1. **Scalar imputation** – fill with fixed sentinel values defined in
        ``SCALAR_IMPUTATIONS`` (``-1`` for numeric fields, SDRF controlled
@@ -300,9 +300,10 @@ def impute_missing_values(sdrf: pd.DataFrame) -> pd.DataFrame:
        ``SOURCE_NAME_MAPS``.  These columns are fully overwritten rather
        than only filling NaN, as they are deterministically derived from
        ``source name``.
-    3. **Plate-specific imputation** – reconstruct
-       ``comment[Gradient time]`` columns for ``KI_Astral_2``
-       (see ``_impute_gradient_time_KI_Astral_2``).
+
+    Plate-specific gradient time imputation (``_impute_gradient_time_KI_Astral_2``)
+    is handled earlier in ``parse_metadata_columns``, before injection order
+    computation.
 
     Parameters
     ----------
@@ -325,9 +326,6 @@ def impute_missing_values(sdrf: pd.DataFrame) -> pd.DataFrame:
     for col, mapping in SOURCE_NAME_MAPS.items():
         if col in df.columns:
             df[col] = df["source name"].map(mapping).fillna("not applicable")
-
-    # 3 — plate-specific
-    df = _impute_gradient_time_KI_Astral_2(df)
 
     return df
 
@@ -401,11 +399,11 @@ def parse_metadata_columns(sdrf: pd.DataFrame) -> pd.DataFrame:
     2. Parse temporal columns (plate arrival, gradient time, thawing timepoint).
     3. Derive ``instrument_type``, ``sample_id``, and ``plate_idx``.
     4. Normalise ``source name`` labels (Cell A → K562, Cell B → HEK293T).
-    5. Compute normalised injection order within each plate.
-    6. Impute missing values (scalar sentinels, source-name lookups,
-       plate-specific rules).
-    7. Enforce column types.
-    8. Drop the duplicate ``comment[plate arrival].1`` column introduced by
+    5. Impute plate-specific gradient times (``KI_Astral_2`` from ``KI_Astral_1``).
+    6. Compute normalised injection order within each plate.
+    7. Impute missing values (scalar sentinels, source-name lookups).
+    8. Enforce column types.
+    9. Drop the duplicate ``comment[plate arrival].1`` column introduced by
        some SDRF files.
 
     Parameters
@@ -449,10 +447,13 @@ def parse_metadata_columns(sdrf: pd.DataFrame) -> pd.DataFrame:
         }
     )
 
-    # 5 — injection order
+    # 5 — plate-specific gradient time imputation (must precede injection order)
+    sdrf = _impute_gradient_time_KI_Astral_2(sdrf)
+
+    # 6 — injection order
     sdrf = compute_injection_order(sdrf)
 
-    # 6 — missing value imputation
+    # 7 — missing value imputation
     sdrf = impute_missing_values(sdrf)
 
     # 7 — type coercion

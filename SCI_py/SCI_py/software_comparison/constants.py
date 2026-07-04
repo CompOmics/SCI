@@ -3,7 +3,8 @@ search_settings_names = {
         '1': 'Library-free',
         '2': 'MBR',
         '3': 'Library-free (recommended settings)',
-        '4': 'Default (2nd pass)'
+        '4': 'Default (2nd pass)',
+        '5' : 'DIANN 2.6'
     },
     'Chimerys': {
         '1': '5.0.0 MS2(Area)',

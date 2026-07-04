@@ -1,6 +1,8 @@
 import pandas as pd
 import anndata
 from typing import cast
+import numpy as np
+from scipy.sparse import issparse
 
 def df_to_anndata(
     df:                pd.DataFrame,
@@ -87,3 +89,50 @@ def align_obs_across_anndata(
         layers = _align_layers(adata_2, X_2_aligned),
     )
     return adata_1, adata_2
+
+
+def replace_zeros_with_nan(adata, layer=None, dtype=np.float32, verbose=True):
+    """Replace zeros with NaN in an AnnData matrix.
+
+    Parameters
+    ----------
+    adata : AnnData
+        The AnnData object to modify in place.
+    layer : str, optional
+        Name of the layer to modify. If None, operates on `adata.X`.
+    dtype : numpy dtype, default np.float32
+        Float dtype to cast the result to. Must support NaN.
+    verbose : bool, default True
+        Whether to print the number of zeros replaced.
+
+    Returns
+    -------
+    AnnData
+        The same AnnData object, modified in place.
+    """
+    X = adata.layers[layer] if layer is not None else adata.X
+
+    if issparse(X):
+        X = X.toarray()
+    else:
+        X = np.asarray(X).copy()
+
+    n_zeros = int((X == 0).sum())
+    n_total = X.size
+
+    if verbose:
+        target = f"layers['{layer}']" if layer is not None else "X"
+        print(
+            f"Replacing {n_zeros} zeros out of {n_total} values in {target} "
+            f"({100 * n_zeros / n_total:.2f}%)"
+        )
+
+    X = X.astype(dtype, copy=False)
+    X[X == 0] = np.nan
+
+    if layer is not None:
+        adata.layers[layer] = X
+    else:
+        adata.X = X
+
+    return adata

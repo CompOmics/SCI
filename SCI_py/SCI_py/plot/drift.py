@@ -5,6 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import seaborn as sns
+import warnings
 from matplotlib.colors import TwoSlopeNorm
 from scipy.stats import linregress
 from scipy.stats import spearmanr
@@ -465,6 +466,119 @@ def plot_rt_drift_precursor(
 
     plt.show() if show else plt.close(fig)
     
+    
+def plot_drift_injection(
+    drift_df:   pd.DataFrame,
+    lab:        str,
+    count_col:  str,
+    conditions: list[str]  = CONDITION_ORDER,
+    datetime_col : str     = 'comment[Gradient time]_datetime',
+    save_dir:   str | None = None,
+    filename:   str        = 'drift_injection.png',
+    show:       bool       = True,
+) -> None:
+    """
+    Plot raw identification counts across global injection order for a single lab,
+    with one subplot per condition and day-shaded background bands.
+
+    The day bands are derived from the global injection order and are consistent
+    (aligned) across all condition subplots.
+
+    Parameters
+    ----------
+    drift_df:
+        Output of ``compute_drift``.
+    lab:
+        Lab identifier matching ``plate_idx``.
+    count_col:
+        Base count column name (without ``_pct``).
+    conditions:
+        Conditions to include.
+    save_dir:
+        Directory for saved figures.
+    filename:
+        Output filename.
+    show:
+        Whether to call ``plt.show()``.
+    """
+    condition_order = [c for c in CONDITION_ORDER if c in conditions]
+
+    # Subset to this lab
+    df = (
+        drift_df[drift_df['plate_idx'] == lab]
+        .dropna(subset=[count_col])
+        .copy()
+    )
+    if df.empty:
+        warnings.warn(f'No data for lab {lab!r}; skipping.')
+        return
+
+    # Global injection order: rank all cells by datetime across the whole lab
+    df = df.sort_values(datetime_col)
+    df['injection_order'] = np.arange(1, len(df) + 1)
+
+    # Map each injection index to its date (for consistent shading across subplots)
+    # day_bands: list of (start_idx, end_idx, date_label) using injection_order values
+    date_col = df['date'].astype(str).str[:10]
+    day_changes = date_col.ne(date_col.shift())
+    day_starts  = df.loc[day_changes, 'injection_order'].values
+    day_ends    = np.append(day_starts[1:], df['injection_order'].max() + 1)
+    day_labels  = date_col[day_changes].values
+
+    n_days  = len(day_starts)
+    # Subtle alternating grey bands; even days slightly shaded, odd days white
+    band_colors = ['#f0f0f0', '#ffffff'] * (n_days // 2 + 1)
+
+    n          = len(condition_order)
+    fig, axes  = plt.subplots(1, n, figsize=(4 * n, 5), sharey=True,
+                               constrained_layout=True)
+    axes = [axes] if n == 1 else list(axes)
+
+    for ax, condition in zip(axes, condition_order):
+        # Draw day bands first (behind data)
+        for i, (start, end, label) in enumerate(zip(day_starts, day_ends, day_labels)):
+            ax.axvspan(start - 0.5, end - 0.5,
+                       color=band_colors[i], zorder=0, lw=0)
+            # Label day at top of band on the first subplot only, to avoid repetition
+            if ax == axes[0]:
+                ax.text(
+                    (start + end) / 2 - 0.5, 1.01, label,
+                    transform=ax.get_xaxis_transform(),
+                    ha='center', va='bottom', fontsize=6, color='#666666',
+                    rotation=30,
+                )
+
+        sub = df[df['source name'] == condition]
+        ax.scatter(
+            sub['injection_order'], sub[count_col],
+            color=CONDITION_COLORS.get(condition, 'steelblue'),
+            alpha=0.4, s=12, zorder=2,
+        )
+
+        # Trend line across the condition
+        if len(sub) > 1:
+            _plot_regression(
+                ax,
+                sub['injection_order'].values,
+                sub[count_col].values,
+                CONDITION_COLORS.get(condition, 'steelblue'),
+                condition,
+                np.linspace(sub['injection_order'].min(),
+                            sub['injection_order'].max(), 200),
+            )
+
+        ax.set_title(condition, fontweight='bold')
+        ax.set_xlabel('Injection order')
+        ax.set_ylabel(count_col if ax == axes[0] else '')
+        ax.spines[['top', 'right']].set_visible(False)
+
+    fig.suptitle(f'{lab} — identifications across injection order', fontweight='bold')
+
+    if save_dir:
+        _save(fig, f'{save_dir}/{filename}')
+
+    plt.show() if show else plt.close(fig)
+
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------

@@ -32,6 +32,7 @@ def plot_counts_overview(
     filename:         str           = 'counts_overview.png',
     title:            str | None    = None,
     show:             bool          = True,
+    sharey:           bool          = False,
 ):
     """
     Plot per-cell identification counts grouped by lab.
@@ -76,7 +77,7 @@ def plot_counts_overview(
 
     if split_conditions:
         n     = len(condition_order)
-        fig, axes = plt.subplots(1, n, figsize=(4 * n, 5), sharey=False)
+        fig, axes = plt.subplots(1, n, figsize=(4 * n, 5), sharey=sharey)
         axes  = [axes] if n == 1 else list(axes)
 
         for ax, condition in zip(axes, condition_order):
@@ -138,11 +139,12 @@ def plot_identification_heatmap(
     sort_conditions:         list[str] | None = None,
     max_samples_per_condition: int | None = None,
     conditions_to_sample:    list[str] | None = None,
+    layer:                   str | None   = None,
     save_dir:                str | None   = None,
     show:                    bool         = True,
 ) -> dict[str, np.ndarray]:
     """
-    Plot per-lab binary identification heatmaps.
+    Plot per-lab identification heatmaps.
 
     Parameters
     ----------
@@ -159,6 +161,9 @@ def plot_identification_heatmap(
         Maximum samples to display per condition (randomly subsampled).
     conditions_to_sample:
         Conditions to apply subsampling to.  ``None`` applies to all.
+    layer:
+        Name of an ``adata.layers`` entry to use as the heatmap colour.
+        ``None`` (default) shows binary presence/absence.
     save_dir:
         Directory for saved figures.  ``None`` disables saving.
     show:
@@ -166,43 +171,47 @@ def plot_identification_heatmap(
 
     Returns
     -------
-    dict mapping lab → binary identification matrix (samples × proteins).
+    dict mapping lab → heatmap matrix (samples × proteins); binary when
+    ``layer`` is ``None``, intensities otherwise.
     """
     condition_order = [c for c in CONDITION_ORDER if c in conditions]
 
     mask           = adata.obs['source name'].isin(condition_order)
     adata_sub      = adata[mask, :]
-    X_full         = adata_sub.X.copy()
+    X_full         = np.array(adata_sub.X)
     obs_full       = adata_sub.obs.copy()
     global_order   = _protein_order(X_full, obs_full, sort_conditions) \
                      if global_protein_order else None
 
-    binary_dfs = {}
+    result = {}
     for lab in LAB_ORDER:
         obs_lab = obs_full[obs_full['plate_idx'] == lab]
         if obs_lab.empty:
             continue
 
-        X_binary, obs_sorted = _prepare_lab(
+        X_out, obs_sorted = _prepare_lab(
             obs_lab, X_full, adata_sub,
             condition_order, global_order, global_protein_order,
             max_samples_per_condition, conditions_to_sample,
+            layer=layer,
         )
 
-        fig = plt.figure(figsize=(max(8, X_binary.shape[0] * 0.08 + 2), 8))
+        fig = plt.figure(figsize=(max(8, X_out.shape[0] * 0.08 + 2), 8))
         gs  = gridspec.GridSpec(2, 1, height_ratios=[0.02, 1], hspace=0.01)
-        _draw_heatmap(fig, gs[1], gs[0], X_binary, obs_sorted, condition_order, title=lab)
+        _draw_heatmap(fig, gs[1], gs[0], X_out, obs_sorted, condition_order,
+                      title=lab, layer=layer)
 
         if save_dir:
-            _save(fig, f'{save_dir}/{lab}_identification_heatmap.png')
+            suffix = f'_heatmap_{layer}' if layer else '_identification_heatmap'
+            _save(fig, f'{save_dir}/{lab}{suffix}.png')
         plt.show() if show else plt.close(fig)
 
-        binary_dfs[lab] = X_binary
+        result[lab] = X_out
 
-    if save_dir:
+    if save_dir and layer is None:
         _save_heatmap_legend(condition_order, save_dir, show)
 
-    return binary_dfs
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -239,11 +248,13 @@ def _prepare_lab(
     obs_lab, X_full, adata_sub,
     condition_order, global_order, global_protein_order,
     max_samples_per_condition, conditions_to_sample,
+    layer=None,
 ):
     obs = _sample_obs(obs_lab, condition_order, max_samples_per_condition, conditions_to_sample)
     idx = [adata_sub.obs.index.get_loc(s) for s in obs.index]
     X   = X_full[idx, :]
 
+    # valid_samples / valid_features always derived from .X (binary presence)
     valid_samples  = np.sum(~np.isnan(X), axis=1) > 0
     valid_features = np.sum(~np.isnan(X), axis=0) > 0
     X   = X[np.ix_(valid_samples, valid_features)]
@@ -262,13 +273,24 @@ def _prepare_lab(
     obs['condition_order'] = obs['source name'].map({c: i for i, c in enumerate(condition_order)})
     obs_sorted             = obs.sort_values(['condition_order', 'n_identified'],
                                               ascending=[True, False])
-    sort_idx  = [list(obs.index).index(s) for s in obs_sorted.index]
-    X_binary  = (~np.isnan(X[np.ix_(sort_idx, protein_order)])).astype(float)
+    sort_idx = [list(obs.index).index(s) for s in obs_sorted.index]
 
-    return X_binary, obs_sorted
+    if layer is None:
+        X_out = (~np.isnan(X[np.ix_(sort_idx, protein_order)])).astype(float)
+    else:
+        X_layer = adata_sub.layers[layer]
+        if hasattr(X_layer, 'toarray'):
+            X_layer = X_layer.toarray()
+        else:
+            X_layer = np.array(X_layer)
+        X_layer = X_layer[np.array(idx), :]
+        X_layer = X_layer[np.ix_(valid_samples, valid_features)]
+        X_out   = X_layer[np.ix_(sort_idx, protein_order)]
+
+    return X_out, obs_sorted
 
 
-def _draw_heatmap(fig, gs_hmap, gs_cbar, X_binary, obs_sorted, condition_order, title=''):
+def _draw_heatmap(fig, gs_hmap, gs_cbar, X, obs_sorted, condition_order, title='', layer=None):
     ax_cbar = fig.add_subplot(gs_cbar)
     ax_hmap = fig.add_subplot(gs_hmap)
 
@@ -284,8 +306,23 @@ def _draw_heatmap(fig, gs_hmap, gs_cbar, X_binary, obs_sorted, condition_order, 
     for spine in ax_cbar.spines.values():
         spine.set_visible(False)
 
-    ax_hmap.imshow(X_binary.T, aspect='auto', interpolation='none',
-                   cmap=ListedColormap(['#f0f0f0', '#2c7bb6']), vmin=0, vmax=1)
+    if layer is None:
+        im = ax_hmap.imshow(X.T, aspect='auto', interpolation='none',
+                            cmap=ListedColormap(['#f0f0f0', '#2c7bb6']), vmin=0, vmax=1)
+    else:
+        cmap_intensity = plt.cm.viridis.copy()
+        cmap_intensity.set_bad('#f0f0f0')
+        im = ax_hmap.imshow(np.ma.masked_invalid(X).T, aspect='auto', interpolation='none',
+                            cmap=cmap_intensity)
+        fig.colorbar(im, ax=ax_hmap, label=layer, fraction=0.02, pad=0.02)
+        # The colorbar steals horizontal space from ax_hmap, shrinking it on the
+        # right. The condition strip (ax_cbar) lives in a separate GridSpec row and
+        # keeps full width, so realign it to the heatmap's x-extent to keep the
+        # sample columns lined up.
+        pos_h = ax_hmap.get_position()
+        pos_c = ax_cbar.get_position()
+        ax_cbar.set_position([pos_h.x0, pos_c.y0, pos_h.width, pos_c.height])
+
     ax_hmap.set(xlabel='Samples', ylabel='Proteins', xticks=[], yticks=[])
 
 

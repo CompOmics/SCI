@@ -53,6 +53,7 @@ def plot_plate_heatmap(
     count_col:    str,
     extra_adata:  "anndata.AnnData | None" = None,
     label:        str                      = 'Features',
+    rotate:       bool                     = False,
     save_dir:     str | None               = None,
     filename_fmt: str                      = '{lab}_plate_heatmap.png',
     show:         bool                     = True,
@@ -74,6 +75,10 @@ def plot_plate_heatmap(
         columns as ``adata.obs``.
     label:
         Feature type label used in the plot title (e.g. ``'Proteins'``).
+    rotate:
+        If ``True``, transpose the plate so X positions run vertically
+        and Y positions run horizontally.  Figure dimensions are adjusted
+        to keep individual well cells at the same size.
     save_dir:
         Directory for saved figures.  ``None`` disables saving.
     filename_fmt:
@@ -105,7 +110,7 @@ def plot_plate_heatmap(
             ['comment[Y position]', 'comment[X position]']
         )['source name'].to_dict()
 
-        fig, ax = _draw_plate(pivot, condition_map, lab, label)
+        fig, ax = _draw_plate(pivot, condition_map, lab, label, rotate=rotate)
 
         if save_dir:
             _save(fig, f'{save_dir}/{filename_fmt.format(lab=lab)}')
@@ -123,21 +128,30 @@ def _prepare_obs(adata) -> "pd.DataFrame":
     return obs
 
 
-def _draw_plate(pivot, condition_map, lab, label):
-    row_labels = pivot.index.tolist()
-    col_labels = pivot.columns.tolist()
-    n_rows, n_cols = len(row_labels), len(col_labels)
+def _draw_plate(pivot, condition_map, lab, label, rotate=False):
+    row_labels = pivot.index.tolist()    # Y positions (1–16)
+    col_labels = pivot.columns.tolist()  # X positions (1–24)
     values = pivot.values.astype(float)
+
+    if rotate:
+        values = values.T
+        row_labels, col_labels = col_labels, row_labels
+
+    n_rows, n_cols = len(row_labels), len(col_labels)
     vmin, vmax = np.nanmin(values), np.nanmax(values)
 
-    fig, ax = plt.subplots(figsize=(12, 6), constrained_layout=True)
+    # Keep cell size constant: 0.5 w × 0.375 h inches (matches original 12×6 for 24×16)
+    figsize = (n_cols * 0.5, n_rows * 0.375)
+    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
 
     for i, row in enumerate(row_labels):
         for j, col in enumerate(col_labels):
-            val       = values[i, j]
-            condition = condition_map.get((row, col))
+            val = values[i, j]
+            # Resolve actual plate coordinates regardless of rotation
+            y_pos, x_pos = (col, row) if rotate else (row, col)
+            condition  = condition_map.get((y_pos, x_pos))
             base_color = (CONDITION_COLORS.get(condition, '#ffffff')
-                          if condition else get_well_color(col, row))
+                          if condition else get_well_color(x_pos, y_pos))
 
             rgb   = mcolors.to_rgb(base_color)
             alpha = (0.3 + 0.7 * (val - vmin) / (vmax - vmin)
@@ -151,17 +165,26 @@ def _draw_plate(pivot, condition_map, lab, label):
                         ha='center', va='center', fontsize=6.5,
                         color='#333333', zorder=2)
 
-    for boundary in [1, 2, 4, 13, 22, 24]:
+    # Boundary lines: X-position dividers become horizontal when rotated
+    if rotate:
+        h_boundaries = [1, 2, 3, 15, 16]      # X dividers → now rows
+        v_boundaries = [1, 2, 4, 13, 22, 24]  # Y dividers → now cols
+    else:
+        h_boundaries = [1, 2, 4, 13, 22, 24]  # Y dividers → rows
+        v_boundaries = [1, 2, 3, 15, 16]       # X dividers → cols
+
+    for boundary in h_boundaries:
         if boundary in row_labels:
             ax.axhline(n_rows - row_labels.index(boundary),
                        color='white', linewidth=2, zorder=3)
-    for boundary in [1, 2, 3, 15, 16]:
+    for boundary in v_boundaries:
         if boundary in col_labels:
             ax.axvline(col_labels.index(boundary),
                        color='white', linewidth=2, zorder=3)
 
+    xlabel, ylabel = ('Row', 'Column') if rotate else ('Column', 'Row')
     ax.set(xlim=(0, n_cols), ylim=(0, n_rows),
-           xlabel='Column', ylabel='Row',
+           xlabel=xlabel, ylabel=ylabel,
            title=f'{lab}  ·  {label} per well')
     ax.set_xticks([j + 0.5 for j in range(n_cols)])
     ax.set_xticklabels(col_labels, fontsize=8)

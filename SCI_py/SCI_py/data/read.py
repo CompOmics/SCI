@@ -69,5 +69,31 @@ def load_spectronaut(path):
     )
     return report
 
-def load_diann(input_csv: str) -> pd.DataFrame:
-    pd
+def load_diann(path) -> pd.DataFrame:
+    report = pd.read_parquet(path)
+    report['plate_id'] = report['Run'].progress_apply(get_institute)
+    report['sample_name'] = report.progress_apply(
+        lambda x: FILENAME_CONVERTERS[x['plate_id']](x['Run']+'.RAW'),
+        axis=1
+    )
+    report['sample_name'] = report['sample_name'].progress_apply(lambda x: x.lower())
+    
+    report['PrecursorIon'] = report.apply(
+        lambda x: (
+            str(x['Modified.Sequence'])
+                .strip()
+                .replace('(UniMod:1)', '[UNIMOD:1]-')
+                .replace('(UniMod:4)', '[UNIMOD:4]')
+                .replace('(UniMod:35)', '[UNIMOD:35]') + '/' + str(x['Precursor.Charge'])
+        ),
+        axis=1
+    )
+    
+    report = report[
+        (report['Global.Peptidoform.Q.Value'] < .01) &
+        (report['Global.PG.Q.Value'] < .01) &
+        (report['PG.Q.Value'] < .05) & # Same as Spectronaut 
+        (report['Q.Value'] < .01)
+    ]
+    
+    return report
