@@ -1,4 +1,6 @@
-# Single-Cell Interlaboratory (SCI) Proteomics
+# **Defining Quality Control Standards for Single-Cell Proteomics by Inter-Laboratory Benchmarking**
+
+> This is a HUPO Single-Cell Initiative (SCI) project.
 
 Analysis code for the SCI benchmarking study, which evaluates single-cell proteomics across **seven participating laboratories**, **nine 384-well plates**, and **two instrument platforms** (Orbitrap Astral, timsTOF). Two human cell lines (K562, HEK293T) are used as single-cell reference material and HeLa as a QC standard. Search results are analysed for two DIA search engines (DIA-NN and Spectronaut).
 
