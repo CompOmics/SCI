@@ -241,8 +241,8 @@ plot_upset_sig <- function(
     cat("Significant proteins per model:\n")
     print(sapply(sig_lists, length))
 
-    fig <- upset(
-        fromList(sig_lists),
+    fig <- UpSetR::upset(
+        UpSetR::fromList(sig_lists),
         order.by        = "freq",
         point.size      = 3,
         line.size       = 1,
@@ -640,8 +640,8 @@ plot_upset_per_plate <- function(
         cat(sprintf("\n%sregulated proteins per model:\n", dir_label[[direction]]))
         print(sapply(sig_lists, length))
 
-        fig <- upset(
-            fromList(sig_lists),
+        fig <- UpSetR::upset(
+            UpSetR::fromList(sig_lists),
             nsets           = length(sig_lists),
             order.by        = "freq",
             point.size      = 3,

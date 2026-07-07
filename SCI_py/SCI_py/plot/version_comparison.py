@@ -942,12 +942,20 @@ def plot_paired_per_lab(
     name_b: str,
     lab_order: list[str],
     sc_conditions: list[str],
+    ncols: int = 3,
     save_dir: str | None = None,
     filename: str = 'B4_paired_per_lab.png',
     show: bool = True,
 ) -> None:
     """
     Paired per-sample identification scatter per lab and per level.
+
+    Each level (e.g. precursor, protein) is drawn as its own labelled block,
+    stacked vertically. Within a block the labs are wrapped into a compact
+    ``ncols``-wide grid (default 3, so nine labs form a 3x3 grid with the
+    timsTOF labs on the bottom row). Blocks are tagged ``(a)``, ``(b)``, ...
+    for referencing in a manuscript. Panels are square with a common x/y
+    range so the identity diagonal is directly readable.
 
     Parameters
     ----------
@@ -962,6 +970,8 @@ def plot_paired_per_lab(
         Display order for labs.
     sc_conditions:
         Single-cell conditions to include.
+    ncols:
+        Number of lab columns per level block.
     save_dir:
         Directory for saved figures.
     filename:
@@ -970,13 +980,26 @@ def plot_paired_per_lab(
         Whether to call ``plt.show()``.
     """
     short = {name_a: name_a.split(' (')[0], name_b: name_b.split(' (')[0]}
-    ncol = len(lab_order)
-    nrow = len(levels)
-    fig, axes = plt.subplots(nrow, ncol, figsize=(3.3 * ncol, 3.5 * nrow), squeeze=False)
+    letters = 'abcdefghijklmnopqrstuvwxyz'
 
-    for r, (level, store) in enumerate(levels):
-        for c, lab in enumerate(lab_order):
-            ax = axes[r][c]
+    n_lab = len(lab_order)
+    ncols = min(ncols, n_lab)
+    nrows = int(np.ceil(n_lab / ncols))
+
+    fig = plt.figure(figsize=(2.5 * ncols, (2.5 * nrows + 0.7) * len(levels)),
+                     constrained_layout=True)
+    subfigs = np.atleast_1d(fig.subfigures(len(levels), 1, hspace=0.03))
+
+    for i, (level, store) in enumerate(levels):
+        subfig = subfigs[i]
+        axes = subfig.subplots(nrows, ncols, squeeze=False)
+
+        for j in range(nrows * ncols):
+            ax = axes[j // ncols][j % ncols]
+            if j >= n_lab:
+                ax.set_visible(False)
+                continue
+            lab = lab_order[j]
             samples = shared_obs([store[name_a], store[name_b]], labs=[lab],
                                  conditions=sc_conditions)
             if len(samples) == 0:
@@ -984,21 +1007,33 @@ def plot_paired_per_lab(
                 continue
             na = _count_ids(store[name_a]).loc[samples, 'n_ids'].values
             nb = _count_ids(store[name_b]).loc[samples, 'n_ids'].values
-            ax.scatter(na, nb, s=12, alpha=0.6, color=LAB_COLORS.get(lab, 'grey'))
-            hi = max(na.max(), nb.max())
-            ax.plot([0, hi], [0, hi], color='grey', linestyle='--', linewidth=1, zorder=0)
+            ax.scatter(na, nb, s=10, alpha=0.55, linewidths=0,
+                       color=LAB_COLORS.get(lab, 'grey'))
+
+            lo = float(min(na.min(), nb.min()))
+            hi = float(max(na.max(), nb.max()))
+            pad = 0.05 * (hi - lo) if hi > lo else 1.0
+            lims = (lo - pad, hi + pad)
+            ax.plot(lims, lims, color='0.5', linestyle='--', linewidth=0.9, zorder=0)
+            ax.set_xlim(lims)
+            ax.set_ylim(lims)
+            ax.set_aspect('equal')
+
             med = np.median(nb - na)
-            ax.set_title(f'{lab}\n{level}: Δ={med:+.0f}', fontsize=8, fontweight='bold')
+            ax.set_title(f'{lab}  (Δ={med:+.0f})', fontsize=8, fontweight='bold')
             ax.spines[['top', 'right']].set_visible(False)
             ax.tick_params(labelsize=6)
-            if r == nrow - 1:
-                ax.set_xlabel(f'# {short[name_a]}', fontsize=7)
-            if c == 0:
-                ax.set_ylabel(f'{level}\n# {short[name_b]}', fontsize=8)
+
+        subfig.supxlabel(f'# {short[name_a]} per sample', fontsize=9)
+        subfig.supylabel(f'# {short[name_b]} per sample', fontsize=9)
+        subfig.suptitle(f'{level}-level identifications', fontsize=11, fontweight='bold')
+        # Bold panel letter in the top-left corner for manuscript referencing.
+        subfig.text(0.005, 0.985, f'({letters[i]})', fontsize=14, fontweight='bold',
+                    ha='left', va='top')
 
     fig.suptitle(f'Paired per-sample identifications per lab — '
-                 f'{short[name_a]} (x) vs {short[name_b]} (y)', fontweight='bold')
-    fig.tight_layout()
+                 f'{short[name_a]} (x) vs {short[name_b]} (y)',
+                 fontsize=12, fontweight='bold')
 
     if save_dir:
         _save(fig, os.path.join(save_dir, filename))
