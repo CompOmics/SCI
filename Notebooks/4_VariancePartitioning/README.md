@@ -1,4 +1,20 @@
-# SCP Analysis Notebook — Setup Instructions
+# 4_VariancePartitioning
+
+Variance decomposition of the single-cell quantification, quantifying how much variability is explained by technical factors (normalisation, plate effects, injection position) versus biological factors (cell type, cell size). The two notebooks apply complementary frameworks at the precursor and protein level and each proceed through the same four successive correction stages. Figures produced here correspond to Figure 6 of the manuscript. Both accept the `SCI_DATA_DIR` and `SCI_FIGURES_DIR` environment variables to switch between search engines.
+
+Environment setup instructions for the required conda environment and Jupyter kernels follow below the notebook overview. Both are R-notebooks run in jupyter notebooks.
+
+## Notebooks
+
+### [01_scplainer.ipynb](01_scplainer.ipynb)
+Fits scplainer (`scp`) linear models to precursor-level log-intensities across four correction stages. Decomposes per-precursor variance by covariate (average bar chart and per-feature violin distributions), runs GMF probabilistic matrix factorisation for dimensionality reduction with rank selection, evaluates batch mixing and biological separation via silhouette scores, and runs a moderated t-test for differential abundance per stage. Exports the batch-corrected object to AnnData for downstream Python analyses.
+
+### [02_VariancePartitioning.ipynb](02_VariancePartitioning.ipynb) (informative)
+Fits `variancePartition` mixed-effects models on protein-level log2 intensities. Applies protein filtering (validated with a retention heatmap) and row-mean imputation, then fits three models corresponding to the correction stages, using `limma::lmFit` residuals to regress out technical effects. Produces per-covariate variance-fraction violin plots and PCA plots per stage, and exports the variance-fraction matrices as CSV and RDS.
+
+---
+
+# SCP Analysis Notebook: Setup Instructions
 
 ## Prerequisites
 
@@ -83,7 +99,6 @@ jupyter notebook
 
 When opening a notebook:
 
-- For **Python notebooks**: select `Python (r45_scp)`
 - For **R notebooks**: select `R (r45_scp)`
 
 To change the kernel in an already open notebook: **Kernel → Change Kernel** from the menu.
