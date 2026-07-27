@@ -7,12 +7,12 @@ dependencies:
   - rpy2
   - pip
   - pip:
-    - anndata
-    - scanpy
-    - numpy
-    - pandas
+    - anndata==0.12.13
+    - scanpy==1.12.1
+    - numpy==2.4.4
+    - pandas==2.3.3
     - scipy
-    - matplotlib
+    - matplotlib==3.10.9
     - seaborn
     - scikit-learn
     - statsmodels
