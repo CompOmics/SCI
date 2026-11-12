@@ -113,6 +113,120 @@ def create_reference_set(
 
     return masked_data, pd.DataFrame(stats)
 
+
+def equalise_plate_missingness(
+    matrix:                    np.ndarray,
+    plate_labels:              np.ndarray | pd.Series,
+    min_sample_completeness:  float = 0.30,
+    min_protein_completeness: float = 0.50,
+    random_seed:               int   = 42,
+) -> dict:
+    """
+    Equalise per-feature missingness across plates within a single sample
+    group. This is the same three-step procedure as `create_reference_set`
+    (sample filtering, reference-feature selection, missingness
+    equalisation), but applied directly to a matrix / plate-label pair
+    instead of stratifying by condition first — every sample passed in is
+    treated as one group.
+
+    Row order is always preserved: with `min_sample_completeness = 0` (no
+    samples dropped), output rows line up 1:1 with `matrix`'s rows. When
+    samples are dropped, `sample_mask` records which original rows survived,
+    in their original order.
+
+    Parameters
+    ----------
+    matrix:
+        (n_samples x n_features) array. NaN marks a missing value.
+    plate_labels:
+        Length-n_samples plate/batch label per row, aligned with `matrix`.
+    min_sample_completeness:
+        Fraction of a plate's detectable features below which a sample is
+        dropped. 0 disables sample filtering.
+    min_protein_completeness:
+        Minimum per-plate detection fraction required, in every plate, for a
+        feature to be kept as a reference feature.
+    random_seed:
+        Seed for reproducible random masking.
+
+    Returns
+    -------
+    Dict with:
+        'masked'       : (n_kept_samples x n_reference_features) matrix, with
+                          extra values set to NaN so every plate has the same
+                          per-feature missingness (matching the plate with the
+                          most missing data for that feature)
+        'sample_mask'   : boolean mask into `matrix`'s rows (kept samples)
+        'feature_mask'  : boolean mask into `matrix`'s columns (reference features)
+        'stats'         : DataFrame of per-plate masking statistics
+    """
+    plate_labels = np.asarray(plate_labels)
+    n_samples, n_features = matrix.shape
+    plates = pd.unique(plate_labels)
+    rng    = np.random.default_rng(random_seed)
+
+    # --- Step 1: sample filtering -------------------------------------------
+    sample_mask = np.ones(n_samples, dtype=bool)
+    for plate in plates:
+        plate_idx = np.where(plate_labels == plate)[0]
+        X_plate   = matrix[plate_idx]
+
+        detected_in_plate = np.sum(~np.isnan(X_plate), axis=0) > 0
+        n_detectable       = detected_in_plate.sum()
+        if n_detectable == 0:
+            continue
+
+        n_observed = np.sum(~np.isnan(X_plate[:, detected_in_plate]), axis=1)
+        threshold  = min_sample_completeness * n_detectable
+        sample_mask[plate_idx] = n_observed >= threshold
+
+    kept_idx          = np.where(sample_mask)[0]
+    kept_plate_labels = plate_labels[kept_idx]
+    X_kept             = matrix[kept_idx]
+
+    # --- Step 2: reference feature selection --------------------------------
+    valid_plates = [p for p in plates if np.sum(kept_plate_labels == p) > 0]
+    completeness = np.vstack([
+        np.sum(~np.isnan(X_kept[kept_plate_labels == plate]), axis=0)
+        / np.sum(kept_plate_labels == plate)
+        for plate in valid_plates
+    ])
+    feature_mask           = np.all(completeness >= min_protein_completeness, axis=0)
+    reference_completeness = completeness[:, feature_mask]
+
+    # --- Step 3: missingness equalisation -----------------------------------
+    missingness        = 1 - reference_completeness
+    target_missingness = np.max(missingness, axis=0)
+
+    X_ref = X_kept[:, feature_mask].copy()
+    stats = []
+    for i, plate in enumerate(valid_plates):
+        plate_idx = np.where(kept_plate_labels == plate)[0]
+        X_plate, n_masked = _equalise_missingness(
+            X_ref[plate_idx], missingness[i], target_missingness, rng
+        )
+        X_ref[plate_idx] = X_plate
+
+        total_masked   = int(sum(n_masked))
+        total_observed = int(np.sum(~np.isnan(X_plate)))
+        stats.append({
+            'plate':                   plate,
+            'n_reference_features':    int(feature_mask.sum()),
+            'n_samples':               len(plate_idx),
+            'total_masked':            total_masked,
+            'pct_masked':              total_masked / (total_observed + total_masked) * 100
+                                       if (total_observed + total_masked) > 0 else 0.0,
+            'mean_masked_per_feature': np.mean(n_masked),
+        })
+
+    return {
+        'masked':       X_ref,
+        'sample_mask':  sample_mask,
+        'feature_mask': feature_mask,
+        'stats':        pd.DataFrame(stats),
+    }
+
+
 def compute_pairwise_correlations(
     masked_data:    dict,
     conditions:     list[str],
