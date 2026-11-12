@@ -1,3 +1,10 @@
+"""Sample-to-sample correlations with missingness equalised across labs.
+
+Builds a reference feature set with equal missingness per lab, computes all
+pairwise Spearman/Pearson correlations within each condition and compares
+correlation distributions. Plots for these results live in
+:mod:`SCI_py.plot.correlations`.
+"""
 from __future__ import annotations
 
 import numpy as np
@@ -6,7 +13,7 @@ from scipy.stats import rankdata, spearmanr
 from scipy.stats import mannwhitneyu
 from tqdm import tqdm
 
-from ..constants.maps import LABS
+from ..constants.labs import LABS
 
 # ---------------------------------------------------------------------------
 # Reference set construction
@@ -151,14 +158,14 @@ def equalise_plate_missingness(
 
     Returns
     -------
-    Dict with:
-        'masked'       : (n_kept_samples x n_reference_features) matrix, with
-                          extra values set to NaN so every plate has the same
-                          per-feature missingness (matching the plate with the
-                          most missing data for that feature)
-        'sample_mask'   : boolean mask into `matrix`'s rows (kept samples)
-        'feature_mask'  : boolean mask into `matrix`'s columns (reference features)
-        'stats'         : DataFrame of per-plate masking statistics
+    dict
+        - ``'masked'``: (n_kept_samples x n_reference_features) matrix, with
+          extra values set to NaN so every plate has the same per-feature
+          missingness (matching the plate with the most missing data for
+          that feature)
+        - ``'sample_mask'``: boolean mask into `matrix`'s rows (kept samples)
+        - ``'feature_mask'``: boolean mask into `matrix`'s columns (reference features)
+        - ``'stats'``: DataFrame of per-plate masking statistics
     """
     plate_labels = np.asarray(plate_labels)
     n_samples, n_features = matrix.shape
@@ -338,6 +345,7 @@ def compute_pairwise_stats(
 
 # For create_reference_set
 def _filter_samples(adata, obs_cond, min_completeness):
+    """Return samples with >= `min_completeness` x the proteins detectable in their lab."""
     kept = []
     for lab in LABS:
         lab_obs = obs_cond[obs_cond['plate_idx'] == lab]
@@ -361,6 +369,7 @@ def _filter_samples(adata, obs_cond, min_completeness):
 
 
 def _compute_lab_completeness(adata, obs_filtered):
+    """Return per-lab arrays of the fraction of samples in which each protein is observed."""
     completeness = {}
     for lab in LABS:
         lab_obs = obs_filtered[obs_filtered['plate_idx'] == lab]
@@ -373,6 +382,7 @@ def _compute_lab_completeness(adata, obs_filtered):
 
 
 def _equalise_missingness(X, current_miss, target_miss, rng):
+    """Randomly set observed values to NaN per column until it reaches `target_miss`; return X and counts masked."""
     n_masked = []
     for p in range(X.shape[1]):
         n_to_mask = int(round((target_miss[p] - current_miss[p]) * X.shape[0]))

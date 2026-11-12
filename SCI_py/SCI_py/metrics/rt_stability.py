@@ -1,3 +1,7 @@
+"""Per-sample normalised retention times and their distribution across the gradient.
+
+Plots for these results live in :mod:`SCI_py.plot.rt_stability`.
+"""
 import pandas as pd
 import numpy as np
 

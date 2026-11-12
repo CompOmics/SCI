@@ -1,3 +1,11 @@
+"""Colours and display orders used by the plotting functions.
+
+- ``CONDITION_COLORS`` / ``LAB_COLORS`` / ``SOFTWARE_COLORS`` -- hex colour per
+  condition (``source name``), anonymised lab and search engine
+- ``CONDITION_ORDER`` / ``LAB_ORDER`` -- order in which conditions and labs are shown
+"""
+from .labs import CONDITIONS, LABS
+
 # Colors
 CONDITION_COLORS = {
     'K562':                 '#9B72CF',   # muted purple
@@ -24,28 +32,9 @@ LAB_COLORS = {
 }
 
 # Orderings
-CONDITION_ORDER = [
-    'K562', 
-    'HEK293T', 
-    'QC - Hela',
-    'Site specific QC', 
-    'Sorting control',
-    'Processing control',
-    'Cellenone blank',
-    'Site specific blanks',
-]
-
-LAB_ORDER = [
-    'Astral_1',
-    'Astral_2',
-    'Astral_3',
-    'Astral_4',
-    'Astral_5',
-    'Astral_6',
-    'timsTOF_1',
-    'timsTOF_2',
-    'timsTOF_3'
-]
+# Same values as SCI_py.constants.labs, kept as separate lists.
+CONDITION_ORDER = list(CONDITIONS)
+LAB_ORDER = list(LABS)
 
 SOFTWARE_COLORS = {
     "MaxQuant": "#8bc6fd",

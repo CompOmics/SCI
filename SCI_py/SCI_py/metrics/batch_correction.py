@@ -1,3 +1,8 @@
+"""Regress covariates (e.g. batch, lab) out of a sample x feature matrix.
+
+- :func:`build_design_matrix` -- intercept + numeric + categorical design matrix from ``obs``
+- :func:`regress_out_covariates` -- per-feature OLS correction that keeps the feature mean
+"""
 from __future__ import annotations
 
 import numpy as np

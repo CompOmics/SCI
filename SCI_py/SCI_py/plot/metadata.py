@@ -1,13 +1,32 @@
+"""
+Overview figures of the sample metadata (SDRF + cellenONE) per plate.
+
+Used in Notebooks/0_Create_data_objects/01_metadata: cell types, QC flags,
+acquisition timeline, instruments, plate arrival, and cell-level QC (diameter,
+injection order, plate position, acquisition dates). There is no matching
+metrics module.
+"""
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import matplotlib.gridspec as gridspec
 import numpy as np
 import pandas as pd
-import os
 from ..constants.plotting import CONDITION_COLORS, LAB_COLORS
 
 
 def plot_cell_types_per_plate(ax, metadata, plate_order):
+    """
+    Stacked bar chart of the number of cells per condition on each plate.
+
+    Parameters
+    ----------
+    ax:
+        Axes to draw on.
+    metadata:
+        Sample metadata with ``plate_idx`` and ``source name`` columns.
+    plate_order:
+        Plate IDs in x-axis order.
+    """
     ct_counts = (metadata.groupby(['plate_idx', 'source name'])
                  .size().unstack(fill_value=0)
                  .reindex(plate_order, fill_value=0))
@@ -28,6 +47,21 @@ def plot_cell_types_per_plate(ax, metadata, plate_order):
 
 
 def plot_qc_flags_per_plate(ax, metadata, plate_order):
+    """
+    Grouped bar chart of QC flag counts per plate.
+
+    The flags are the columns ``Reinjection``, ``Doublet``, ``Dividing`` and
+    ``CellInBlank``, summed per plate.
+
+    Parameters
+    ----------
+    ax:
+        Axes to draw on.
+    metadata:
+        Sample metadata with ``plate_idx`` and the four QC flag columns.
+    plate_order:
+        Plate IDs in x-axis order.
+    """
     qc_cols   = ['Reinjection', 'Doublet', 'Dividing', 'CellInBlank']
     qc_colors = ['#e07b54', '#5b8db8', '#76b876', '#b87bb8']
 
@@ -53,6 +87,20 @@ def plot_qc_flags_per_plate(ax, metadata, plate_order):
 
 
 def plot_acquisition_timeline(ax, metadata, plate_order):
+    """
+    Scatter of acquisition datetimes, one row per plate.
+
+    Parameters
+    ----------
+    ax:
+        Axes to draw on.
+    metadata:
+        Sample metadata with ``plate_idx`` and
+        ``comment[Gradient time]_datetime``. Rows without a datetime are
+        dropped.
+    plate_order:
+        Plates to draw, coloured with ``LAB_COLORS``.
+    """
     for plate in plate_order:
         sub = (metadata[metadata['plate_idx'] == plate]
                .dropna(subset=['comment[Gradient time]_datetime'])
@@ -73,6 +121,16 @@ def plot_acquisition_timeline(ax, metadata, plate_order):
 
 
 def plot_plates_per_instrument(ax, metadata):
+    """
+    Bar chart of the number of plates per instrument type.
+
+    Parameters
+    ----------
+    ax:
+        Axes to draw on.
+    metadata:
+        Sample metadata with ``instrument_type`` and ``plate_idx`` columns.
+    """
     instrument_counts = (metadata.groupby('instrument_type')['plate_idx']
                          .nunique()
                          .sort_values(ascending=False))
@@ -92,6 +150,21 @@ def plot_plates_per_instrument(ax, metadata):
 
 
 def plot_plate_arrival(ax, metadata, plate_order):
+    """
+    Horizontal bar chart of plate arrival, in days after the first plate arrived.
+
+    Each bar is labelled with the arrival date.
+
+    Parameters
+    ----------
+    ax:
+        Axes to draw on.
+    metadata:
+        Sample metadata with ``plate_idx`` and
+        ``comment[plate arrival]_datetime``. Plates without a date are skipped.
+    plate_order:
+        Plates to include.
+    """
     arrival = (metadata.groupby('plate_idx')['comment[plate arrival]_datetime']
                .first()
                .dropna()
@@ -116,6 +189,27 @@ def plot_plate_arrival(ax, metadata, plate_order):
 
 
 def plot_metadata_overview(metadata, save_path=None):
+    """
+    Assemble the five plate-level metadata panels into one figure.
+
+    Panels: cell types, QC flags, acquisition timeline, plates per instrument
+    and plate arrival. Plates are shown in sorted ``plate_idx`` order. The
+    figure is always shown.
+
+    Parameters
+    ----------
+    metadata:
+        Sample metadata (one row per cell) with the columns used by the
+        individual panel functions.
+    save_path:
+        If given, save the figure to this path with ``plt.savefig``
+        (single file, 150 dpi). ``None`` disables saving.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The overview figure.
+    """
     plate_order = sorted(metadata['plate_idx'].unique())
 
     fig = plt.figure(figsize=(20, 24))

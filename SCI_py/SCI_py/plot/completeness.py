@@ -1,10 +1,17 @@
+"""
+Completeness plots: feature- and sample-level retention curves per lab.
+
+Part of the dataset statistics / QC-metrics analysis
+(Notebooks/2_DatasetStatistics/02_QC_Metrics). The curves are computed in
+``SCI_py.metrics.completeness``.
+"""
 from __future__ import annotations
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 from ..constants.plotting import LAB_COLORS
-from .utilities import _save
+from .export import save_figure
 
 
 def plot_completeness(
@@ -84,6 +91,6 @@ def plot_completeness(
     fig.suptitle(f'Completeness — {label} ({cond_label})', fontweight='bold')
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
 
     plt.show() if show else plt.close(fig)

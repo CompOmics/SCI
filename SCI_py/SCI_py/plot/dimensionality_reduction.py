@@ -1,3 +1,9 @@
+"""
+PCA and 2D-embedding scatter grids, coloured by ``obs`` columns.
+
+Used to look at sample structure (lab, condition) across datasets. The
+embeddings are computed in ``SCI_py.metrics.dimensionality_reduction``.
+"""
 from __future__ import annotations
 
 import os
@@ -6,10 +12,10 @@ from matplotlib.lines import Line2D
 import pandas as pd
 
 from ..constants.plotting import CONDITION_COLORS, CONDITION_ORDER, LAB_COLORS, LAB_ORDER
-from .utilities import _save
+from .export import save_figure
 
 # Built-in (palette, category order) for obs columns with a project-wide convention.
-BUILTIN_PALETTES = {
+_BUILTIN_PALETTES = {
     'source name': (CONDITION_COLORS, CONDITION_ORDER),
     'plate_idx':   (LAB_COLORS, LAB_ORDER),
 }
@@ -57,7 +63,7 @@ def plot_pca_comparison(
     suptitle:
         Optional figure-level title, e.g. to label which sample set is shown.
     save_dir / filename / show:
-        Standard figure-saving controls (see `SCI_py.plot.utilities._save`).
+        Standard figure-saving controls (see `SCI_py.plot.export.save_figure`).
     """
     palettes = palettes or {}
     orders   = orders or {}
@@ -73,8 +79,8 @@ def plot_pca_comparison(
     for row, color_col in enumerate(color_by):
         labels = obs[color_col].to_numpy()
 
-        if color_col in BUILTIN_PALETTES:
-            color_map, order = BUILTIN_PALETTES[color_col]
+        if color_col in _BUILTIN_PALETTES:
+            color_map, order = _BUILTIN_PALETTES[color_col]
         elif color_col in palettes:
             color_map = palettes[color_col]
             order     = orders.get(color_col, list(color_map.keys()))
@@ -111,14 +117,14 @@ def plot_pca_comparison(
         fig.subplots_adjust(top=0.90)
 
     if save_dir:
-        _save(fig, os.path.join(save_dir, filename))
+        save_figure(fig, os.path.join(save_dir, filename))
 
     plt.show() if show else plt.close(fig)
 
     return fig, axes
 
 
-METHOD_LABELS = {'pca': 'PCA', 'umap': 'UMAP', 'tsne': 't-SNE'}
+_METHOD_LABELS = {'pca': 'PCA', 'umap': 'UMAP', 'tsne': 't-SNE'}
 
 
 def plot_embedding_comparison(
@@ -166,7 +172,7 @@ def plot_embedding_comparison(
     suptitle:
         Optional figure-level title, e.g. to label which sample set is shown.
     save_dir / filename / show:
-        Standard figure-saving controls (see `SCI_py.plot.utilities._save`).
+        Standard figure-saving controls (see `SCI_py.plot.export.save_figure`).
     """
     palettes = palettes or {}
     orders   = orders or {}
@@ -184,8 +190,8 @@ def plot_embedding_comparison(
     for row, color_col in enumerate(color_by):
         labels = obs[color_col].to_numpy()
 
-        if color_col in BUILTIN_PALETTES:
-            color_map, order = BUILTIN_PALETTES[color_col]
+        if color_col in _BUILTIN_PALETTES:
+            color_map, order = _BUILTIN_PALETTES[color_col]
         elif color_col in palettes:
             color_map = palettes[color_col]
             order     = orders.get(color_col, list(color_map.keys()))
@@ -206,7 +212,7 @@ def plot_embedding_comparison(
                 ax.scatter(coords[mask, 0], coords[mask, 1], s=point_size, alpha=alpha,
                            color=color_map[cat], linewidths=0, label=cat)
 
-            label = METHOD_LABELS.get(method, method)
+            label = _METHOD_LABELS.get(method, method)
             if method == 'pca':
                 var = entry['explained_variance_ratio']
                 ax.set_xlabel(f"PC1 ({var[0]:.1%})")
@@ -228,7 +234,7 @@ def plot_embedding_comparison(
         fig.subplots_adjust(top=0.90)
 
     if save_dir:
-        _save(fig, os.path.join(save_dir, filename))
+        save_figure(fig, os.path.join(save_dir, filename))
 
     plt.show() if show else plt.close(fig)
 

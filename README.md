@@ -71,8 +71,8 @@ Each notebook expects a kernel matching its environment (`sci_env`, `R (r45_scp)
 
 ### 4. Verify the Python installation
 ```python
-from SCI_py.metrics import correlations, drift
-from SCI_py.plot import identifications
+from SCI_py.metrics import compute_pairwise_correlations, compute_drift
+from SCI_py.plot import plot_counts_overview
 import anndata
 print("Installation successful.")
 ```
@@ -120,7 +120,7 @@ The analysis is delivered as notebooks rather than a command-line tool. Each not
 Run the notebooks in the numbered order described in [`Notebooks/README.md`](Notebooks/README.md). In short: build the data objects (folder 0), then run the downstream analyses (folders 1 to 5). Folder-level READMEs describe each notebook, its inputs, and the figures it produces.
 
 ### Running on your own data
-The notebooks operate on the AnnData objects produced in `0_Create_data_objects`. To analyse a new dataset, generate `metadata.parquet` and the AnnData objects with the folder-0 notebooks (adjusting the input paths and, if needed, the site-specific filename converters in `SCI_py`), then run the downstream notebooks unchanged. Point `SCI_DATA_DIR` and `SCI_FIGURES_DIR` at your own locations to keep inputs and outputs separate from the repository.
+The notebooks operate on the AnnData objects produced in `0_Create_data_objects`. To analyse a new dataset, generate `metadata.parquet` and the AnnData objects with the folder-0 notebooks (adjusting the input paths and, if needed, the site-specific filename converters in `SCI_py.metadata.filenames`), then run the downstream notebooks unchanged. Point `SCI_DATA_DIR` and `SCI_FIGURES_DIR` at your own locations to keep inputs and outputs separate from the repository.
 
 ---
 
@@ -138,12 +138,13 @@ SCI/
 ├── SCI_py/                    Python package
 │   ├── setup.py
 │   └── SCI_py/
-│       ├── constants/           Lab maps, condition colours, plotting constants
-│       ├── data/                AnnData construction and I/O
-│       ├── metadata/            SDRF / cellenONE parsing
-│       ├── metrics/             Completeness, correlations, CVs, drift, RT stability
-│       ├── plot/                Visualisation modules
-│       └── software_comparison/ QC-mixture parsing and benchmark comparison
+│       ├── constants/           Labs, sample/plate facts, colours
+│       ├── metadata/            Build the metadata table (SDRF / cellenONE / annotations)
+│       ├── data/                Load search-engine reports, build AnnData
+│       ├── benchmark/           Search-engine comparison on the QC/Quant samples (ProteoBench)
+│       ├── metrics/             Computations: completeness, CVs, correlations, drift, ...
+│       └── plot/                Figures; same module names as metrics/
+├── docs/                      Package documentation (Sphinx; see "Documentation" below)
 ├── SCI_R/                     R plotting/helper scripts for the R notebooks
 └── Notebooks/                 Analysis notebooks (see Notebooks/README.md)
     ├── 0_Create_data_objects/    Data ingestion and AnnData construction
@@ -153,6 +154,19 @@ SCI/
     ├── 4_VariancePartitioning/   Variance decomposition across covariates
     └── 5_DifferentialExpression/ Differential expression between cell lines
 ```
+
+---
+
+## Documentation
+
+The `SCI_py` documentation (package layout, which function each notebook uses, and the full API reference) is built with Sphinx from the docstrings:
+
+```bash
+pip install -r docs/requirements.txt
+sphinx-build -b html docs docs/_build/html
+```
+
+Open `docs/_build/html/index.html` in a browser. The repository also contains a `.readthedocs.yaml`, so the same docs can be hosted on Read the Docs by importing the GitHub repository there.
 
 ---
 

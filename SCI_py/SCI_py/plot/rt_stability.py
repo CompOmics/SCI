@@ -1,3 +1,9 @@
+"""
+Retention-time distribution (RT stability) curves per sample.
+
+Used in Notebooks/2_DatasetStatistics/02_QC_Metrics and 03_Drift_over_time.
+The per-sample RT proportions are computed in ``SCI_py.metrics.rt_stability``.
+"""
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
@@ -5,10 +11,10 @@ import matplotlib.lines as mlines
 import pandas as pd
 
 from ..constants.plotting import CONDITION_COLORS, LAB_COLORS
-from .utilities import _save
+from .export import save_figure
 
 
-BUILTIN_PALETTES = {
+_BUILTIN_PALETTES = {
     'source name': CONDITION_COLORS,
     'plate_idx':   LAB_COLORS,
 }
@@ -26,6 +32,44 @@ def plot_rt_stability(
     filename:        str          = 'rt_stability.png',
     show:            bool         = True,
 ):
+    """
+    Plot per-sample retention-time distributions, with group mean curves.
+
+    Each sample is a thin line of the proportion of identifications per RT
+    bin. If ``color_by`` is a numeric column (and not ``source name`` or
+    ``plate_idx``), samples are coloured with a colormap and a colorbar is
+    added; otherwise they are coloured by category.
+
+    Parameters
+    ----------
+    rt_props:
+        Long-format DataFrame with ``sample_id``, ``bin_mid``,
+        ``proportion`` and the ``color_by`` column (as returned by
+        ``compute_rt_proportions``).
+    color_by:
+        Column used to colour samples and group the mean curves.
+    show_individual:
+        Whether to draw the per-sample curves.
+    show_mean:
+        Whether to draw the mean curve per group (or per value for a
+        numeric ``color_by``).
+    title:
+        Prefix for the plot title (``'<title> RT stability'``).
+    cmap:
+        Colormap name for a numeric ``color_by``.
+    palette:
+        Dict mapping category to colour. Only used when ``color_by`` is not
+        ``source name`` or ``plate_idx`` (those have built-in palettes).
+        Falls back to the matplotlib colour cycle.
+    save_dir:
+        Directory for saved figures. ``None`` disables saving. When saving,
+        a separate legend (or colorbar) figure is saved as
+        ``<filename>_legend``.
+    filename:
+        Filename for the main figure.
+    show:
+        Whether to call ``plt.show()``.
+    """
     sample_meta = (
         rt_props[['sample_id', color_by]]
         .drop_duplicates()
@@ -33,7 +77,7 @@ def plot_rt_stability(
     )
 
     continuous = (
-        color_by not in BUILTIN_PALETTES
+        color_by not in _BUILTIN_PALETTES
         and pd.api.types.is_numeric_dtype(sample_meta)
     )
 
@@ -44,7 +88,7 @@ def plot_rt_stability(
         sample_color = {s: cmap_obj(norm(v)) for s, v in sample_meta.items()}
     else:
         _palette = (
-            BUILTIN_PALETTES.get(color_by)
+            _BUILTIN_PALETTES.get(color_by)
             or palette
             or dict(zip(
                 sample_meta.unique(),
@@ -92,7 +136,7 @@ def plot_rt_stability(
     ax.spines[['top', 'right']].set_visible(False)
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
         if continuous:
             _save_rt_colorbar(cmap_obj, norm, color_by, save_dir, filename, show)
         else:
@@ -102,18 +146,20 @@ def plot_rt_stability(
 
 
 def _save_rt_colorbar(cmap_obj, norm, label, save_dir, filename, show):
+    """Save a stand-alone vertical colorbar for a numeric ``color_by``."""
     fig, ax = plt.subplots(figsize=(1.2, 4))
     fig.colorbar(plt.cm.ScalarMappable(cmap=cmap_obj, norm=norm),
                  cax=ax, orientation='vertical', label=label)
-    _save(fig, f'{save_dir}/{filename.replace(".png", "_legend.png")}')
+    save_figure(fig, f'{save_dir}/{filename.replace(".png", "_legend.png")}')
     plt.show() if show else plt.close(fig)
 
 
 def _save_rt_legend(groups, palette, color_by, save_dir, filename, show):
+    """Save a stand-alone line legend for a categorical ``color_by``."""
     handles = [mlines.Line2D([], [], color=palette.get(g, 'black'), linewidth=2, label=g)
                for g in groups]
     fig, ax = plt.subplots(figsize=(4, len(groups) * 0.4 + 0.5))
     ax.legend(handles=handles, title=color_by, loc='center', frameon=False, fontsize=9)
     ax.axis('off')
-    _save(fig, f'{save_dir}/{filename.replace(".png", "_legend.png")}')
+    save_figure(fig, f'{save_dir}/{filename.replace(".png", "_legend.png")}')
     plt.show() if show else plt.close(fig)

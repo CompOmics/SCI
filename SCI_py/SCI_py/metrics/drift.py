@@ -1,3 +1,7 @@
+"""Intra-day drift of identifications and retention time over acquisition order.
+
+Plots for these results live in :mod:`SCI_py.plot.drift`.
+"""
 from __future__ import annotations
 
 import pandas as pd
@@ -6,7 +10,7 @@ from scipy.stats import linregress
 from tqdm import tqdm
 import numpy as np
 from scipy.stats import spearmanr
-from ..constants.maps import LABS
+from ..constants.labs import LABS
 
 _DATETIME_COL = 'comment[Gradient time]_datetime'
 

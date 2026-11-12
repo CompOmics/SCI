@@ -1,9 +1,16 @@
+"""
+Identification count plots and identification heatmaps per lab.
+
+Part of the counts and CVs analysis (Notebooks/2_DatasetStatistics/01_Counts_CVs).
+Counts are read from ``adata.obs`` columns such as ``n_proteins``; there is no
+matching metrics module.
+"""
 from __future__ import annotations
 import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 from ..constants.plotting import CONDITION_ORDER, LAB_ORDER, LAB_COLORS, CONDITION_COLORS
-from .utilities import _save, _save_legend, _save_legend_from_mapping
+from .export import save_figure, save_legend_from_mapping
 
 import numpy as np
 import matplotlib.gridspec as gridspec
@@ -13,6 +20,7 @@ import pandas as pd
 import warnings
 
 def _metric_label(count_col: str) -> str:
+    """Return a readable axis label for an obs count column (e.g. ``n_proteins``)."""
     _METRIC_LABELS = {
         'n_proteins'  : 'Number of proteins',
         'n_precursors': 'Number of precursors',
@@ -123,8 +131,8 @@ def plot_counts_overview(
         fig.tight_layout()
 
     if save_dir:
-        _save(fig, os.path.join(save_dir, filename))
-        _save_legend_from_mapping(LAB_COLORS, save_dir, title='Lab')
+        save_figure(fig, os.path.join(save_dir, filename))
+        save_legend_from_mapping(LAB_COLORS, save_dir, title='Lab')
 
     if show:
         plt.show()
@@ -203,7 +211,7 @@ def plot_identification_heatmap(
 
         if save_dir:
             suffix = f'_heatmap_{layer}' if layer else '_identification_heatmap'
-            _save(fig, f'{save_dir}/{lab}{suffix}.png')
+            save_figure(fig, f'{save_dir}/{lab}{suffix}.png')
         plt.show() if show else plt.close(fig)
 
         result[lab] = X_out
@@ -223,6 +231,7 @@ def _protein_order(
     obs:              "pd.DataFrame",
     sort_conditions:  list[str] | None,
 ) -> np.ndarray:
+    """Return protein column indices sorted by identification count, highest first."""
     if sort_conditions is not None:
         mask = obs['source name'].isin(sort_conditions).values
         counts = np.sum(~np.isnan(X[mask, :]), axis=0)
@@ -232,6 +241,7 @@ def _protein_order(
 
 
 def _sample_obs(obs, condition_order, max_n, conditions_to_sample):
+    """Randomly subsample up to ``max_n`` cells per condition (seed 42); return obs unchanged if ``max_n`` is None."""
     if max_n is None:
         return obs
     to_sample = conditions_to_sample or condition_order
@@ -250,6 +260,7 @@ def _prepare_lab(
     max_samples_per_condition, conditions_to_sample,
     layer=None,
 ):
+    """Build the sorted heatmap matrix and obs for one lab; return ``(X_out, obs_sorted)``."""
     obs = _sample_obs(obs_lab, condition_order, max_samples_per_condition, conditions_to_sample)
     idx = [adata_sub.obs.index.get_loc(s) for s in obs.index]
     X   = X_full[idx, :]
@@ -291,6 +302,7 @@ def _prepare_lab(
 
 
 def _draw_heatmap(fig, gs_hmap, gs_cbar, X, obs_sorted, condition_order, title='', layer=None):
+    """Draw the condition colour strip and the identification (or layer intensity) heatmap."""
     ax_cbar = fig.add_subplot(gs_cbar)
     ax_hmap = fig.add_subplot(gs_hmap)
 
@@ -327,6 +339,7 @@ def _draw_heatmap(fig, gs_hmap, gs_cbar, X, obs_sorted, condition_order, title='
 
 
 def _save_heatmap_legend(condition_order, save_dir, show):
+    """Save the condition and identification legends for the identification heatmaps."""
     for handles, title, fname in [
         (
             [Patch(facecolor=CONDITION_COLORS.get(c, 'grey'), label=c) for c in condition_order],
@@ -344,5 +357,5 @@ def _save_heatmap_legend(condition_order, save_dir, show):
         ax.legend(handles=handles, loc='center', frameon=False,
                   fontsize=9, title=title, title_fontsize=10)
         ax.axis('off')
-        _save(fig, f'{save_dir}/{fname}')
+        save_figure(fig, f'{save_dir}/{fname}')
         plt.show() if show else plt.close(fig)

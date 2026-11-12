@@ -1,6 +1,6 @@
 """
-SCI_py.read
-===========
+SCI_py.metadata.read
+====================
 Reading and ingestion functions for single-cell proteomics metadata sources.
 
 Three data sources are supported:
@@ -15,13 +15,13 @@ Three data sources are supported:
 
 Typical usage
 -------------
->>> sdrf        = SCI_read.read_SDRF(ROOT_SDRF_IN)
->>> isolated_df = SCI_read.read_cellenONE(ROOT_CELLENONE_IN)
+>>> sdrf        = read_SDRF(ROOT_SDRF_IN)
+>>> isolated_df = read_cellenONE(ROOT_CELLENONE_IN)
 >>> metadata    = sdrf.merge(isolated_df,
 ...                 on=['comment[X position]', 'comment[Y position]',
 ...                     'comment[Plate Number]'],
 ...                 how='left')
->>> metadata    = SCI_read.add_docx_annotations(metadata)
+>>> metadata    = add_docx_annotations(metadata)
 """
 
 from __future__ import annotations
@@ -31,8 +31,9 @@ from glob import glob
 
 import pandas as pd
 
-from ..constants.metadata import LAB_TO_PLATENR, PLATE_ANNOTATIONS
-from .parse import FILENAME_CONVERTERS, xy_to_rc
+from ..constants.samples import LAB_TO_PLATENR, PLATE_ANNOTATIONS
+from .columns import xy_to_rc
+from .filenames import FILENAME_CONVERTERS
 
 __all__ = [
     "read_SDRF",

@@ -1,3 +1,10 @@
+"""
+Plots for identification and retention-time drift over acquisition time.
+
+Part of the drift analysis (Notebooks/2_DatasetStatistics/03_Drift_over_time):
+feature counts per day, normalised stability, intra-day drift, drift p-values
+and RT drift. The computations live in ``SCI_py.metrics.drift``.
+"""
 from __future__ import annotations
 
 import numpy as np
@@ -11,7 +18,7 @@ from scipy.stats import linregress
 from scipy.stats import spearmanr
 
 from ..constants.plotting import CONDITION_ORDER, CONDITION_COLORS, LAB_COLORS, LAB_ORDER
-from .utilities import _save, _save_legend
+from .export import save_figure, save_legend
 
 _DATE_COL = 'comment[Gradient time]_date'
 
@@ -86,8 +93,8 @@ def plot_features_by_day(
     ax.get_legend().remove()
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
-        _save_legend(ax, save_dir, filename + '_legend')
+        save_figure(fig, f'{save_dir}/{filename}')
+        save_legend(ax, save_dir, filename + '_legend')
 
     plt.show() if show else plt.close(fig)
 
@@ -156,7 +163,7 @@ def plot_feature_stability(
     fig.suptitle(f'{count_col} stability over time', fontweight='bold')
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
         _save_stability_legend(save_dir, filename)
 
     plt.show() if show else plt.close(fig)
@@ -255,11 +262,11 @@ def plot_drift(
         ax.legend(frameon=False, fontsize=8)
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
         if mode == 'daily':
             _save_drift_daily_legend(palette, save_dir, filename)
         else:
-            _save_legend(axes[0], save_dir, filename + '_legend')
+            save_legend(axes[0], save_dir, filename + '_legend')
 
     plt.show() if show else plt.close(fig)
 
@@ -321,7 +328,7 @@ def plot_drift_significance(
                  fontweight='bold')
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
 
     plt.show() if show else plt.close(fig)
 
@@ -374,7 +381,7 @@ def plot_rt_drift_correlations(
     fig.suptitle('RT drift correlations per lab', fontweight='bold')
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
 
     plt.show() if show else plt.close(fig)
 
@@ -462,7 +469,7 @@ def plot_rt_drift_precursor(
 
     if save_dir:
         fname = filename or f'rt_drift_{precursor}.png'
-        _save(fig, f'{save_dir}/{fname}')
+        save_figure(fig, f'{save_dir}/{fname}')
 
     plt.show() if show else plt.close(fig)
     
@@ -575,7 +582,7 @@ def plot_drift_injection(
     fig.suptitle(f'{lab} — identifications across injection order', fontweight='bold')
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
 
     plt.show() if show else plt.close(fig)
 
@@ -584,6 +591,7 @@ def plot_drift_injection(
 # ---------------------------------------------------------------------------
 
 def _plot_regression(ax, x, y, color, label, x_line):
+    """Fit a linear regression of ``y`` on ``x`` (NaNs dropped) and draw the line with slope and p in the label."""
     mask = ~np.isnan(y)
     x, y = x[mask], y[mask]
     if len(x) < 2:
@@ -594,6 +602,7 @@ def _plot_regression(ax, x, y, color, label, x_line):
 
 
 def _save_drift_daily_legend(palette, save_dir, filename):
+    """Save the acquisition-date colour legend next to the daily drift figure."""
     handles = [
         mlines.Line2D([], [], color=c, linewidth=2, marker='o', markersize=5, label=l)
         for l, c in palette.items()
@@ -601,11 +610,12 @@ def _save_drift_daily_legend(palette, save_dir, filename):
     fig, ax = plt.subplots(figsize=(3, len(handles) * 0.35 + 0.5))
     ax.legend(handles=handles, title='Acquisition date', loc='center', frameon=False, fontsize=9)
     ax.axis('off')
-    _save(fig, f'{save_dir}/{filename.replace(".png", "_legend.png")}')
+    save_figure(fig, f'{save_dir}/{filename.replace(".png", "_legend.png")}')
     plt.close(fig)
 
 
 def _build_stability_df(adata, count_col, condition_order) -> pd.DataFrame:
+    """Collect obs per lab with relative acquisition day and counts scaled to % of the condition maximum."""
     dfs = []
     for lab in LAB_ORDER:
         df = adata.obs[
@@ -631,6 +641,7 @@ def _build_stability_df(adata, count_col, condition_order) -> pd.DataFrame:
 
 
 def _save_stability_legend(save_dir, filename):
+    """Save the lab colour legend for the feature-stability figure."""
     handles = [
         mlines.Line2D([], [], color=LAB_COLORS.get(lab, 'black'), linewidth=2, label=lab)
         for lab in LAB_ORDER
@@ -638,5 +649,5 @@ def _save_stability_legend(save_dir, filename):
     fig, ax = plt.subplots(figsize=(4, len(LAB_ORDER) * 0.4 + 0.5))
     ax.legend(handles=handles, title='Lab', loc='center', frameon=False, fontsize=9)
     ax.axis('off')
-    _save(fig, f'{save_dir}/{filename + '_legend'}')
+    save_figure(fig, f'{save_dir}/{filename + '_legend'}')
     plt.close(fig)

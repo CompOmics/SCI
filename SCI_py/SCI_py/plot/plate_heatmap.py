@@ -1,3 +1,10 @@
+"""
+Plate heatmaps of per-well identification counts, one figure per lab.
+
+Part of the QC-metrics analysis (Notebooks/2_DatasetStatistics/02_QC_Metrics).
+Wells are coloured by condition or plate section; there is no matching metrics
+module.
+"""
 from __future__ import annotations
 
 import numpy as np
@@ -7,7 +14,7 @@ import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
 
 from ..constants.plotting import CONDITION_COLORS, LAB_ORDER
-from .utilities import _save
+from .export import save_figure
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +93,7 @@ def plot_plate_heatmap(
     show:
         Whether to call ``plt.show()``.
     """
-    obs = _prepare_obs(adata)
+    obs = prepare_plate_obs(adata)
 
     for lab in LAB_ORDER:
         plate_obs = obs[obs['plate_idx'] == lab]
@@ -95,7 +102,7 @@ def plot_plate_heatmap(
 
         # Merge extra wells if provided
         if extra_adata is not None:
-            extra_obs   = _prepare_obs(extra_adata)
+            extra_obs   = prepare_plate_obs(extra_adata)
             extra_plate = extra_obs[extra_obs['plate_idx'] == lab]
             plate_obs   = plate_obs._append(extra_plate).drop_duplicates(
                 subset=['comment[X position]', 'comment[Y position]']
@@ -113,15 +120,29 @@ def plot_plate_heatmap(
         fig, ax = _draw_plate(pivot, condition_map, lab, label, rotate=rotate)
 
         if save_dir:
-            _save(fig, f'{save_dir}/{filename_fmt.format(lab=lab)}')
+            save_figure(fig, f'{save_dir}/{filename_fmt.format(lab=lab)}')
         plt.show() if show else plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
-# Private helpers
+# Helpers
 # ---------------------------------------------------------------------------
 
-def _prepare_obs(adata) -> "pd.DataFrame":
+def prepare_plate_obs(adata) -> "pd.DataFrame":
+    """
+    Return a copy of ``adata.obs`` with integer well positions.
+
+    Parameters
+    ----------
+    adata:
+        AnnData object with ``comment[X position]`` and ``comment[Y position]``
+        in ``obs``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of ``obs`` with both position columns cast to ``int``.
+    """
     obs = adata.obs.copy()
     obs['comment[X position]'] = obs['comment[X position]'].astype(int)
     obs['comment[Y position]'] = obs['comment[Y position]'].astype(int)
@@ -129,6 +150,7 @@ def _prepare_obs(adata) -> "pd.DataFrame":
 
 
 def _draw_plate(pivot, condition_map, lab, label, rotate=False):
+    """Draw one plate as a grid of wells shaded by count and coloured by condition or section; return ``(fig, ax)``."""
     row_labels = pivot.index.tolist()    # Y positions (1–16)
     col_labels = pivot.columns.tolist()  # X positions (1–24)
     values = pivot.values.astype(float)

@@ -16,3 +16,6 @@ batch_mixing_power/**
 
 # Figures
 # **/Figures/**
+# Documentation build output (regenerated on every build)
+docs/_build/
+docs/generated/

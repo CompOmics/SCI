@@ -1,3 +1,9 @@
+"""
+Coefficient of variation (CV) plots per lab and condition.
+
+Part of the counts and CVs analysis (Notebooks/2_DatasetStatistics/01_Counts_CVs).
+CVs are computed in ``SCI_py.metrics.cvs``.
+"""
 from __future__ import annotations
 
 import os
@@ -5,7 +11,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from ..constants.plotting import CONDITION_ORDER, LAB_ORDER, LAB_COLORS, CONDITION_COLORS
-from .utilities import _save, _save_legend, _save_legend_from_mapping
+from ..metrics.cvs import filter_common_proteome
+from .export import save_figure, save_legend_from_mapping
 
 def plot_cvs_overview(
     cvs,
@@ -64,7 +71,7 @@ def plot_cvs_overview(
     cvs = cvs[cvs['condition'].isin(condition_order) & (cvs['n'] >= min_n)].copy()
 
     if common_proteome:
-        cvs = _filter_common_proteome(cvs, condition_order)
+        cvs = filter_common_proteome(cvs, condition_order)
 
     # --- Plot dispatch ---
     _plot_fn = _violin if plot_type == 'violin' else _box
@@ -77,8 +84,8 @@ def plot_cvs_overview(
                                    ylabel, ylim, _plot_fn)
 
     if save_dir:
-        _save(fig, os.path.join(save_dir, filename))
-        _save_legend_from_mapping(LAB_COLORS, save_dir, title='Lab', filename='legend_cvs.png')
+        save_figure(fig, os.path.join(save_dir, filename))
+        save_legend_from_mapping(LAB_COLORS, save_dir, title='Lab', filename='legend_cvs.png')
 
     plt.show() if show else plt.close(fig)
 
@@ -87,24 +94,9 @@ def plot_cvs_overview(
 # Private helpers
 # ---------------------------------------------------------------------------
 
-def _filter_common_proteome(cvs, condition_order):
-    """Keep only features quantified in all labs, per condition."""
-    n_labs = len(LAB_ORDER)
-    common = (
-        cvs.groupby(['condition', 'feature_id'])['lab']
-           .nunique()
-           .reset_index(name='n_labs')
-           .query('n_labs == @n_labs')
-           .groupby('condition')['feature_id']
-           .apply(set)
-    )
-    return cvs[cvs.apply(
-        lambda row: row['feature_id'] in common.get(row['condition'], set()),
-        axis=1
-    )]
-
 
 def _violin(data, x, y, order, palette, hue=None, hue_order=None, ax=None):
+    """Draw a seaborn violin plot (quartile lines), coloured by ``x`` when no ``hue`` is given."""
     kwargs = dict(width=0.8, inner='quartile')
     if hue:
         sns.violinplot(data=data, x=x, y=y, hue=hue, hue_order=hue_order,
@@ -116,6 +108,7 @@ def _violin(data, x, y, order, palette, hue=None, hue_order=None, ax=None):
 
 
 def _box(data, x, y, order, palette, hue=None, hue_order=None, ax=None):
+    """Draw a seaborn box plot (small fliers), coloured by ``x`` when no ``hue`` is given."""
     kwargs = dict(width=0.6, flierprops=dict(marker='o', markersize=2, alpha=0.4))
     if hue:
         sns.boxplot(data=data, x=x, y=y, hue=hue, hue_order=hue_order,
@@ -127,6 +120,7 @@ def _box(data, x, y, order, palette, hue=None, hue_order=None, ax=None):
 
 
 def _plot_split(cvs, condition_order, ylabel, ylim, common_proteome, plot_fn):
+    """Draw one CV panel per condition with labs on the x-axis; return ``(fig, axes)``."""
     n     = len(condition_order)
     fig, axes = plt.subplots(1, n, figsize=(4 * n, 5),
                               sharey=True, constrained_layout=True)
@@ -153,6 +147,7 @@ def _plot_split(cvs, condition_order, ylabel, ylim, common_proteome, plot_fn):
 
 
 def _plot_combined(cvs, condition_order, color_by, ylabel, ylim, plot_fn):
+    """Draw all CVs on one axis, grouped and coloured per ``color_by``; return ``(fig, [ax])``."""
     if color_by == 'source name':
         x, hue, order, hue_order, palette = (
             'lab', 'condition', LAB_ORDER, condition_order, CONDITION_COLORS

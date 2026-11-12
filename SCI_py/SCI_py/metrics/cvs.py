@@ -1,8 +1,37 @@
+"""Coefficients of variation (CV) per feature, lab and condition.
+
+Plots for these results live in :mod:`SCI_py.plot.cvs`.
+"""
 import numpy as np
 import pandas as pd
 import warnings
 
+from ..constants.labs import LABS
+
 def compute_cv_matrix(adata, conditions, layer=''):
+    """
+    Compute the CV of every feature within each lab x condition group.
+
+    CV = sample standard deviation (ddof=1) / mean x 100, ignoring NaNs. Only
+    features with more than one non-NaN value in the group are kept. Values are
+    used as stored, so pass a linear-scale (not log) layer for a standard CV.
+
+    Parameters
+    ----------
+    adata:
+        AnnData with ``plate_idx`` and ``source name`` in ``obs``.
+    conditions:
+        ``source name`` values to include.
+    layer:
+        Layer to use. Empty string uses ``X``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Long format, one row per lab x condition x feature, with columns
+        ``lab``, ``condition``, ``feature_id``, ``cv`` (in percent), ``n``
+        (number of non-NaN values) and ``lab|condition``.
+    """
     cvs_list = []
     samples = adata.obs[adata.obs['source name'].isin(conditions)].index
 
@@ -32,3 +61,19 @@ def compute_cv_matrix(adata, conditions, layer=''):
                 'lab|condition': plate + '|' + cond
             })
     return pd.DataFrame(cvs_list)
+
+def filter_common_proteome(cvs, condition_order):
+    """Keep only features quantified in all labs, per condition."""
+    n_labs = len(LABS)
+    common = (
+        cvs.groupby(['condition', 'feature_id'])['lab']
+           .nunique()
+           .reset_index(name='n_labs')
+           .query('n_labs == @n_labs')
+           .groupby('condition')['feature_id']
+           .apply(set)
+    )
+    return cvs[cvs.apply(
+        lambda row: row['feature_id'] in common.get(row['condition'], set()),
+        axis=1
+    )]

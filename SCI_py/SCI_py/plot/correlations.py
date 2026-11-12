@@ -1,3 +1,11 @@
+"""
+Plots for the sample-correlation analysis.
+
+Covers missingness masking (masking stats, identification heatmap, missingness
+distributions), intra- and inter-lab correlations, instrument comparisons and
+sample-pair scatters (Notebooks/3_Correlations/01_sample_correlations). The
+computations live in ``SCI_py.metrics.correlations``.
+"""
 from __future__ import annotations
 
 import numpy as np
@@ -12,8 +20,8 @@ from scipy.stats import linregress
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 
-from ..constants.plotting import CONDITION_COLORS, LAB_COLORS, LAB_ORDER
-from .utilities import _save
+from ..constants.plotting import LAB_COLORS, LAB_ORDER
+from .export import save_figure
 
 
 def plot_masking_stats(
@@ -59,7 +67,7 @@ def plot_masking_stats(
     fig.suptitle('Masking applied to enforce equal missingness across labs', fontweight='bold')
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
     plt.show() if show else plt.close(fig)
 
 
@@ -111,7 +119,7 @@ def plot_masking_heatmap(
     fig.suptitle(f'Post-masking identification heatmap — {condition}', fontweight='bold')
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
         _save_binary_legend(save_dir)
 
     plt.show() if show else plt.close(fig)
@@ -242,7 +250,7 @@ def plot_missingness_distributions(
     )
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
     plt.show() if show else plt.close(fig)
 
     return ks_df
@@ -341,7 +349,7 @@ def plot_coobserved_diagnostic(
     fig.suptitle(f'Co-observed protein diagnostic ({method})', fontweight='bold')
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
     plt.show() if show else plt.close(fig)
 
 
@@ -381,7 +389,7 @@ def plot_intralab_correlation(
         ax.spines[['top', 'right']].set_visible(False)
 
         if save_dir:
-            _save(fig, f'{save_dir}/{filename_fmt.format(cond=cond, method=method)}')
+            save_figure(fig, f'{save_dir}/{filename_fmt.format(cond=cond, method=method)}')
         plt.show() if show else plt.close(fig)
 
 
@@ -487,7 +495,7 @@ def plot_instrument_correlation(
         ax.spines[['top', 'right']].set_visible(False)
 
         if save_dir:
-            _save(fig, f'{save_dir}/{filename_fmt.format(cond=cond, method=method)}')
+            save_figure(fig, f'{save_dir}/{filename_fmt.format(cond=cond, method=method)}')
         plt.show() if show else plt.close(fig)
 
 
@@ -583,7 +591,7 @@ def plot_sample_pair_correlations(
     fig.suptitle(f'{condition} — {la} vs {lb} ({method})', fontweight='bold')
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
     plt.show() if show else plt.close(fig)
 
 
@@ -722,11 +730,12 @@ def plot_intralab_pairwise_stats(
     )
 
     if save_dir:
-        _save(fig, f'{save_dir}/{filename}')
+        save_figure(fig, f'{save_dir}/{filename}')
     plt.show() if show else plt.close(fig)
 
 
 def _save_binary_legend(save_dir):
+    """Save the Identified / Missing legend for the masking heatmap."""
     fig, ax = plt.subplots(figsize=(3, 1.5))
     ax.legend(
         handles=[Patch(facecolor='#2c7bb6', label='Identified'),
@@ -735,7 +744,7 @@ def _save_binary_legend(save_dir):
         title='Identification', title_fontsize=10,
     )
     ax.axis('off')
-    _save(fig, f'{save_dir}/legend_masking_heatmap.png')
+    save_figure(fig, f'{save_dir}/legend_masking_heatmap.png')
     plt.close(fig)
     
 # ---------------------------------------------------------------------------

@@ -1,3 +1,7 @@
+"""PCA, UMAP and t-SNE embeddings of one or more aligned sample x feature matrices.
+
+Plots for these results live in :mod:`SCI_py.plot.dimensionality_reduction`.
+"""
 from __future__ import annotations
 
 import numpy as np

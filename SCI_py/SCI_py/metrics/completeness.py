@@ -1,7 +1,11 @@
+"""Data completeness (fraction of non-missing values) per lab, sample and feature.
+
+Plots for these results live in :mod:`SCI_py.plot.completeness`.
+"""
 from __future__ import annotations
 
 import numpy as np
-from ..constants.maps import LABS
+from ..constants.labs import LABS
 
 
 def compute_completeness(

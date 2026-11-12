@@ -1,0 +1,10 @@
+# Packages needed to build the documentation (not to run the analyses).
+sphinx>=8
+furo
+numpy
+pandas
+matplotlib
+scipy
+seaborn
+tqdm
+packaging
